@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, useCallback } from 'react'
+import { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react'
 import type { ReactNode } from 'react'
 import type { User, Session } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabase'
@@ -47,11 +47,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null)
   const [loading, setLoading] = useState(true)
 
+  const fetchingForRef = useRef<string | null>(null)
+
   const fetchProfile = useCallback(async (userId: string) => {
+    if (fetchingForRef.current === userId) {
+      console.log('fetchProfile already in progress for:', userId)
+      return
+    }
+    fetchingForRef.current = userId
     try {
       console.log('fetchProfile called for:', userId)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const timeoutPromise = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error('timeout')), 5000)
+        setTimeout(() => reject(new Error('timeout')), 15000)
       )
       const queryPromise = supabase
         .from('profiles')
@@ -60,13 +68,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .maybeSingle()
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { data, error } = await Promise.race([queryPromise, timeoutPromise]) as any
-      console.log('fetchProfile result:', { data: !!data, error })
+      console.log('fetchProfile result:', { hasData: !!data, error })
       if (data) {
         setProfile(data as Profile)
       }
     } catch (err) {
       console.error('fetchProfile error:', err)
     } finally {
+      fetchingForRef.current = null
       setLoading(false)
     }
   }, [])
@@ -99,30 +108,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     initialize()
 
+    const lastEventRef = { current: '' }
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         if (!mounted) return
         console.log('Auth state change:', event, !!session)
-        if (event === 'SIGNED_IN' && session?.user) {
-          setSession(session)
-          setUser(session.user)
-          // Small delay to ensure session is fully set before querying
-          await new Promise(resolve => setTimeout(resolve, 500))
-          if (mounted) {
-            await fetchProfile(session.user.id)
+
+        if (event === 'SIGNED_IN') {
+          if (lastEventRef.current === 'SIGNED_IN') {
+            console.log('Ignoring duplicate SIGNED_IN')
+            return
           }
-        } else if (event === 'TOKEN_REFRESHED' && session?.user) {
-          setSession(session)
-          setUser(session.user)
-          setLoading(false)
+          lastEventRef.current = 'SIGNED_IN'
+          if (session?.user) {
+            setSession(session)
+            setUser(session.user)
+            await new Promise(r => setTimeout(r, 500))
+            if (mounted) await fetchProfile(session.user.id)
+          }
         } else if (event === 'SIGNED_OUT') {
+          lastEventRef.current = 'SIGNED_OUT'
           setSession(null)
           setUser(null)
           setProfile(null)
           setLoading(false)
         } else if (event === 'INITIAL_SESSION') {
-          // Handled by getSession() in initialize()
+          lastEventRef.current = 'INITIAL_SESSION'
+          // Already handled by initialize()
         }
+        // TOKEN_REFRESHED and other events intentionally ignored
       }
     )
 
