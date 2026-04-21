@@ -57,17 +57,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     fetchingForRef.current = userId
     try {
       console.log('fetchProfile called for:', userId)
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const timeoutPromise = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error('timeout')), 15000)
-      )
-      const queryPromise = supabase
+      // No client-side timeout — let Supabase respond naturally.
+      // Cold starts on the free tier can take 20-30s; a hard timeout
+      // causes the profile to arrive after loading=false, triggering a
+      // spurious redirect to /onboarding. The 30s failsafe in initialize()
+      // is the safety net if the DB never responds.
+      const { data, error } = await supabase
         .from('profiles')
         .select('*')
         .eq('user_id', userId)
         .maybeSingle()
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data, error } = await Promise.race([queryPromise, timeoutPromise]) as any
       console.log('fetchProfile result:', { hasData: !!data, error })
       if (data) {
         setProfile(data as Profile)
@@ -89,6 +88,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let mounted = true
 
+    // Absolute last resort: if Supabase never responds, unblock the UI.
+    const failsafe = setTimeout(() => {
+      if (mounted) {
+        console.warn('Auth init: 30s failsafe triggered')
+        fetchingForRef.current = null
+        setLoading(false)
+      }
+    }, 30000)
+
     async function initialize() {
       try {
         const { data: { session } } = await supabase.auth.getSession()
@@ -103,6 +111,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } catch (err) {
         console.error('Auth init error:', err)
         if (mounted) setLoading(false)
+      } finally {
+        clearTimeout(failsafe)
       }
     }
 
