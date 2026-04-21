@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="112" fill="#1A1A1A"/>
+  <text x="256" y="300"
+    font-family="Inter, system-ui, sans-serif"
+    font-size="172" font-weight="800"
+    fill="white" text-anchor="middle"
+    letter-spacing="-8">hap</text>
+  <circle cx="415" cy="196" r="28" fill="#4A90D9"/>
+</svg>
