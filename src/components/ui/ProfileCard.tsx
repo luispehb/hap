@@ -2,8 +2,7 @@ import { TrustBadge } from './TrustBadge'
 import { AffinityBar } from './AffinityBar'
 import { IntentBlock } from './IntentBlock'
 import { Chip } from './Chip'
-import { Button } from './Button'
-import { getProfilePhoto } from '../../lib/photos'
+import { getProfilePhoto, getBannerPhoto } from '../../lib/photos'
 
 interface Profile {
   display_name: string
@@ -32,24 +31,6 @@ interface ProfileCardProps {
   onJoinPlan: () => void
 }
 
-const CITY_COLORS: Record<string, string> = {
-  AE: '#B8D4E8',
-  FJ: '#C8E0B8',
-  KO: '#F0D4B8',
-  PT: '#D4B8E0',
-  UZ: '#B8E0D4',
-}
-
-function getCityColor(city: string): string {
-  const code = city.trim().toUpperCase().charCodeAt(0)
-  if (code >= 65 && code <= 69) return CITY_COLORS.AE
-  if (code >= 70 && code <= 74) return CITY_COLORS.FJ
-  if (code >= 75 && code <= 79) return CITY_COLORS.KO
-  if (code >= 80 && code <= 84) return CITY_COLORS.PT
-  return CITY_COLORS.UZ
-}
-
-
 function computeAffinity(profileInterests: string[], viewerInterests: string[]): number {
   if (viewerInterests.length === 0) return 0
   const matches = profileInterests.filter(i => viewerInterests.includes(i)).length
@@ -77,67 +58,87 @@ export function ProfileCard({
   onConnect,
   onJoinPlan,
 }: ProfileCardProps) {
-  const bgColor = getCityColor(profile.origin_city)
   const affinity = computeAffinity(profile.interests, viewerInterests)
   const daysLabel = getDaysLabel(profile.trip_end_date, profile.is_local)
 
   return (
-    <div className="bg-white border border-[#E8E4DC] rounded-card overflow-hidden">
-      {/* Photo strip */}
-      <div className="h-[140px] relative overflow-hidden rounded-t-[20px]">
-        <img
-          src={getProfilePhoto(profile.display_name, profile.origin_city)}
-          alt={profile.display_name}
-          className="w-full h-full object-cover"
-          onError={e => { e.currentTarget.style.display = 'none' }}
-        />
-        {/* Fallback colour behind img */}
-        <div className="absolute inset-0 -z-10" style={{ backgroundColor: bgColor }} />
-        <div
-          className="absolute inset-0"
-          style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.65) 0%, rgba(0,0,0,0.1) 60%, transparent 100%)' }}
-        />
+    <div className="rounded-[20px] overflow-visible" style={{ filter: 'drop-shadow(0 2px 8px rgba(0,0,0,0.08))' }}>
 
-        {/* Trust badge — top right */}
-        <div className="absolute top-2.5 right-2.5 z-10">
+      {/* BANNER + AVATAR BUBBLE */}
+      <div className="relative">
+
+        {/* Banner — 110px */}
+        <div className="h-[110px] w-full overflow-hidden rounded-t-[20px] relative">
+          <img
+            src={getBannerPhoto(profile.display_name, profile.origin_city)}
+            alt=""
+            className="w-full h-full object-cover"
+            onError={e => { e.currentTarget.style.display = 'none' }}
+          />
+          {/* Fallback gradient behind image */}
+          <div className="absolute inset-0 -z-10" style={{ background: 'linear-gradient(135deg, #B8D4E8, #7EB3D4)' }} />
+          <div
+            className="absolute inset-0 rounded-t-[20px]"
+            style={{ background: 'linear-gradient(to bottom, transparent 40%, rgba(0,0,0,0.3) 100%)' }}
+          />
+        </div>
+
+        {/* Avatar bubble — overlaps banner */}
+        <div className="absolute -bottom-5 left-4 z-10">
+          <div className="w-14 h-14 rounded-2xl overflow-hidden" style={{ border: '3px solid white' }}>
+            <img
+              src={getProfilePhoto(profile.display_name, profile.origin_city)}
+              alt={profile.display_name}
+              className="w-full h-full object-cover"
+              onError={e => { e.currentTarget.style.display = 'none' }}
+            />
+          </div>
+          {/* Verified dot on avatar */}
+          {profile.is_verified && (
+            <div className="absolute z-20" style={{ bottom: '-2px', left: '42px' }}>
+              <div className="w-4 h-4 rounded-full bg-green-400 border-2 border-white flex items-center justify-center">
+                <svg width="8" height="8" viewBox="0 0 8 8" fill="none">
+                  <path d="M1.5 4L3 5.5L6.5 2.5" stroke="white" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Trust badge — top right of banner */}
+        <div className="absolute top-3 right-3 z-10">
           <TrustBadge score={profile.trust_score} />
         </div>
 
-        {/* Name + meta — bottom */}
-        <div className="absolute bottom-0 left-0 right-0 px-3 pb-2.5 z-10">
-          <div className="flex items-end justify-between">
-            <div>
-              <p className="text-white font-extrabold text-sm tracking-tight flex items-center gap-1.5">
-                {profile.display_name}
-                {profile.is_verified && (
-                  <span className="w-1.5 h-1.5 rounded-full bg-green-400 flex-shrink-0" />
-                )}
-              </p>
-              <p className="text-white/60 text-[10px] mt-0.5">
-                {profile.origin_city}
-                {daysLabel ? ` · ${daysLabel}` : ''}
-              </p>
-            </div>
-          </div>
-        </div>
       </div>
 
-      {/* Card body */}
-      <div className="px-3 py-3 flex flex-col gap-2.5">
+      {/* CARD BODY — top padding for avatar overlap */}
+      <div className="bg-white px-4 pt-8 pb-3 rounded-b-[20px] border border-t-0 border-[#E8E4DC]">
+
+        {/* Name + meta */}
+        <div className="mb-2">
+          <p className="text-ink font-extrabold text-base tracking-tight">{profile.display_name}</p>
+          <p className="text-muted text-xs mt-0.5">
+            {profile.origin_city}{daysLabel ? ` · ${daysLabel}` : ''}
+          </p>
+        </div>
+
         {/* Affinity bar */}
         <AffinityBar percentage={affinity} />
 
-        {/* Active plan intent block */}
+        {/* Intent block */}
         {activePlan && (
-          <IntentBlock
-            emoji={activePlan.emoji}
-            text={activePlan.title}
-            time={activePlan.time}
-          />
+          <div className="mt-2">
+            <IntentBlock
+              emoji={activePlan.emoji}
+              text={activePlan.title}
+              time={activePlan.time}
+            />
+          </div>
         )}
 
         {/* Interest chips */}
-        <div className="flex flex-wrap gap-1.5">
+        <div className="flex gap-1.5 flex-wrap mt-2 mb-3">
           {profile.interests.map(interest => (
             <Chip
               key={interest}
@@ -147,23 +148,22 @@ export function ProfileCard({
           ))}
         </div>
 
-        {/* Action buttons */}
-        <div className="flex gap-2 pt-0.5">
-          <Button variant="outline" size="sm" onClick={onPass}>
+        {/* Buttons */}
+        <div className="flex gap-2">
+          <button
+            onClick={onPass}
+            className="flex-1 py-2.5 rounded-xl text-xs font-bold border border-[#E8E4DC] text-muted bg-white active:bg-sand transition cursor-pointer"
+          >
             Pass
-          </Button>
-          <div className="flex-1">
-            {activePlan ? (
-              <Button variant="cta" size="sm" fullWidth onClick={onJoinPlan}>
-                Join plan
-              </Button>
-            ) : (
-              <Button variant="primary" size="sm" fullWidth onClick={onConnect}>
-                Connect
-              </Button>
-            )}
-          </div>
+          </button>
+          <button
+            onClick={activePlan ? onJoinPlan : onConnect}
+            className="flex-[2] py-2.5 rounded-xl text-xs font-bold bg-ink text-white active:opacity-80 transition cursor-pointer"
+          >
+            {activePlan ? 'Join plan' : 'Connect'}
+          </button>
         </div>
+
       </div>
     </div>
   )

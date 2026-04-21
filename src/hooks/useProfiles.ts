@@ -1,20 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
-
-export interface Profile {
-  id: string
-  display_name: string
-  origin_city: string
-  current_city: string
-  trip_start_date: string | null
-  trip_end_date: string | null
-  is_local: boolean
-  bio_question: string
-  interests: string[]
-  trust_score: number
-  is_verified: boolean
-  membership_status: string
-}
+export type { Profile } from '../contexts/AuthContext'
+import type { Profile } from '../contexts/AuthContext'
 
 function computeAffinity(profileInterests: string[], viewerInterests: string[]): number {
   if (!viewerInterests.length) return 0

@@ -6,7 +6,8 @@ import { useProfile } from '../hooks/useProfile'
 import { Chip } from '../components/ui/Chip'
 import { Button } from '../components/ui/Button'
 import { BottomNav } from '../components/ui/BottomNav'
-import { getProfilePhoto } from '../lib/photos'
+import { getProfilePhoto, getBannerPhoto, hashString } from '../lib/photos'
+import { TrustBadge } from '../components/ui/TrustBadge'
 import { supabase } from '../lib/supabase'
 
 const ALL_INTERESTS = [
@@ -74,6 +75,7 @@ export function Profile() {
   const [connecting, setConnecting] = useState(false)
   const [toast, setToast] = useState('')
   const [pendingCount, setPendingCount] = useState(0)
+  const [photoIndex, setPhotoIndex] = useState(0)
 
   function showToast(msg: string) {
     setToast(msg)
@@ -150,54 +152,111 @@ export function Profile() {
   const socialLinks = (profile as unknown as { social_links?: Record<string, string> }).social_links ?? {}
   const activeSocialPlatforms = Object.entries(socialLinks).filter(([, v]) => v)
 
+  const carouselPhotos = [
+    getProfilePhoto(profile.display_name, profile.origin_city),
+    getBannerPhoto(profile.display_name, profile.origin_city),
+    `https://picsum.photos/seed/${hashString(profile.id + 'c3')}/400/500`,
+  ]
+
   return (
     <div className="min-h-screen bg-cream flex flex-col">
 
-      {/* Photo section */}
-      <div className="h-[200px] relative overflow-hidden flex-shrink-0">
-        <img
-          src={getProfilePhoto(profile.display_name, profile.origin_city)}
-          alt={profile.display_name}
-          className="w-full h-full object-cover"
-          onError={e => { e.currentTarget.style.display = 'none' }}
-        />
-        {/* Fallback gradient */}
-        <div
-          className="absolute inset-0 -z-10"
-          style={{ background: 'linear-gradient(135deg, #B8D4E8, #7EB3D4)' }}
-        />
-        <div
-          className="absolute inset-0"
-          style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.7) 0%, transparent 60%)' }}
-        />
-
-        {/* Back button for other profiles */}
-        {!isOwnProfile && (
+      {isOwnProfile ? (
+        /* Own profile: banner + avatar bubble */
+        <div className="relative flex-shrink-0">
+          <div className="h-[130px] overflow-hidden">
+            <img
+              src={getBannerPhoto(profile.display_name, profile.origin_city)}
+              alt=""
+              className="w-full h-full object-cover"
+              onError={e => { e.currentTarget.style.display = 'none' }}
+            />
+            <div className="absolute inset-x-0 top-0 h-[130px] -z-10" style={{ background: 'linear-gradient(135deg, #B8D4E8, #7EB3D4)' }} />
+          </div>
+          <div className="absolute -bottom-8 left-4 z-10">
+            <div className="w-20 h-20 rounded-2xl overflow-hidden" style={{ border: '3px solid white' }}>
+              <img
+                src={getProfilePhoto(profile.display_name, profile.origin_city)}
+                alt={profile.display_name}
+                className="w-full h-full object-cover"
+                onError={e => { e.currentTarget.style.display = 'none' }}
+              />
+            </div>
+          </div>
+          {profile.is_verified && (
+            <div className="absolute top-3 right-3 z-10 bg-white/15 backdrop-blur-sm border border-white/25 rounded-xl px-3 py-1.5">
+              <p className="text-white text-[10px] font-bold">✓ Verified</p>
+            </div>
+          )}
+        </div>
+      ) : (
+        /* Non-own profile: Raya-style photo carousel */
+        <div className="relative h-[280px] overflow-hidden flex-shrink-0">
+          <div
+            className="flex h-full transition-transform duration-300"
+            style={{ transform: `translateX(-${photoIndex * 100}%)` }}
+          >
+            {carouselPhotos.map((photo, i) => (
+              <div key={i} className="w-full h-full flex-shrink-0">
+                <img
+                  src={photo}
+                  alt=""
+                  className="w-full h-full object-cover"
+                  onError={e => { e.currentTarget.style.display = 'none' }}
+                />
+              </div>
+            ))}
+          </div>
+          {/* Tap zones */}
+          <div className="absolute inset-0 flex z-10">
+            <div className="flex-1 cursor-pointer" onClick={() => setPhotoIndex(i => Math.max(0, i - 1))} />
+            <div className="flex-1 cursor-pointer" onClick={() => setPhotoIndex(i => Math.min(carouselPhotos.length - 1, i + 1))} />
+          </div>
+          {/* Dots */}
+          <div className="absolute top-3 left-0 right-0 flex justify-center gap-1.5 z-20">
+            {carouselPhotos.map((_, i) => (
+              <div
+                key={i}
+                className={`h-1 rounded-full transition-all ${i === photoIndex ? 'w-6 bg-white' : 'w-1.5 bg-white/50'}`}
+              />
+            ))}
+          </div>
+          {/* Back button */}
           <button
             onClick={() => navigate(-1)}
-            className="absolute top-12 left-4 w-8 h-8 bg-white/20 rounded-xl flex items-center justify-center cursor-pointer active:opacity-70 transition z-10"
+            className="absolute top-12 left-4 w-9 h-9 bg-black/30 backdrop-blur-sm rounded-xl flex items-center justify-center border border-white/20 z-20 cursor-pointer active:opacity-70"
           >
             <ChevronLeft size={18} className="text-white" />
           </button>
-        )}
-
-        {/* Verified badge top right */}
-        {profile.is_verified && (
-          <div className="absolute top-12 right-4 z-10 bg-white/15 backdrop-blur-sm border border-white/25 rounded-xl px-3 py-1.5">
-            <p className="text-white text-[10px] font-bold">✓ Verified</p>
+          {/* Gradient overlay */}
+          <div
+            className="absolute bottom-0 left-0 right-0 h-32 z-10"
+            style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.7) 0%, transparent 100%)' }}
+          />
+          {/* Name + trust badge overlay */}
+          <div className="absolute bottom-4 left-4 right-4 z-20">
+            <div className="flex items-end justify-between">
+              <div>
+                <p className="text-white font-extrabold text-2xl tracking-tight leading-tight">
+                  {profile.display_name}
+                </p>
+                <p className="text-white/70 text-xs mt-0.5">
+                  {profile.origin_city} · {daysLabel}
+                </p>
+              </div>
+              <TrustBadge score={profile.trust_score} />
+            </div>
           </div>
-        )}
-
-        {/* Name overlay bottom */}
-        <div className="absolute bottom-0 left-0 right-0 px-4 pb-4 z-10">
-          <p className="text-white font-extrabold text-xl tracking-tight">
-            {profile.display_name}
-          </p>
-          <p className="text-white/60 text-xs mt-0.5">
-            {profile.origin_city} · {profile.is_local ? 'Local' : daysLabel}
-          </p>
         </div>
-      </div>
+      )}
+
+      {/* Own profile: name + meta below banner/avatar */}
+      {isOwnProfile && (
+        <div className="pt-12 px-4 pb-2">
+          <p className="text-ink font-extrabold text-xl tracking-tight">{profile.display_name}</p>
+          <p className="text-muted text-xs mt-0.5">{profile.origin_city} · {profile.is_local ? 'Local' : 'Traveler'}</p>
+        </div>
+      )}
 
       {/* Body */}
       <div className="flex-1 overflow-y-auto pb-24 px-4 py-4 flex flex-col gap-4">

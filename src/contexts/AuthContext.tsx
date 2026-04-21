@@ -2,7 +2,26 @@ import { createContext, useContext, useEffect, useState, useCallback } from 'rea
 import type { ReactNode } from 'react'
 import type { User, Session } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabase'
-import type { Profile } from '../hooks/useProfiles'
+
+export interface Profile {
+  id: string
+  user_id: string
+  display_name: string
+  avatar_url?: string
+  origin_city: string
+  current_city: string
+  trip_start_date: string | null
+  trip_end_date: string | null
+  is_local: boolean
+  bio_question: string
+  interests: string[]
+  social_links: Record<string, string>
+  trust_score: number
+  is_verified: boolean
+  is_premium: boolean
+  membership_status: string
+  created_at: string
+}
 
 interface AuthContextType {
   user: User | null
@@ -22,8 +41,6 @@ const AuthContext = createContext<AuthContextType>({
   refreshProfile: async () => {},
 })
 
-let isFetching = false
-
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [profile, setProfile] = useState<Profile | null>(null)
@@ -31,60 +48,92 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true)
 
   const fetchProfile = useCallback(async (userId: string) => {
-    if (isFetching) return
-    isFetching = true
-    console.log('Fetching profile for userId:', userId)
     try {
-      const { data, error } = await supabase
+      console.log('fetchProfile called for:', userId)
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('timeout')), 5000)
+      )
+      const queryPromise = supabase
         .from('profiles')
         .select('*')
         .eq('user_id', userId)
         .maybeSingle()
-      console.log('Profile fetch result:', { data, error })
-      if (data) setProfile(data as Profile)
-      else setProfile(null)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data, error } = await Promise.race([queryPromise, timeoutPromise]) as any
+      console.log('fetchProfile result:', { data: !!data, error })
+      if (data) {
+        setProfile(data as Profile)
+      }
+    } catch (err) {
+      console.error('fetchProfile error:', err)
     } finally {
-      isFetching = false
       setLoading(false)
     }
   }, [])
 
   const refreshProfile = useCallback(async () => {
-    if (user) await fetchProfile(user.id)
+    if (user?.id) {
+      await fetchProfile(user.id)
+    }
   }, [user, fetchProfile])
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session)
-      setUser(session?.user ?? null)
-      if (session?.user) {
-        fetchProfile(session.user.id).finally(() => setLoading(false))
-      } else {
-        setLoading(false)
-      }
-    })
+    let mounted = true
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (_event, session) => {
+    async function initialize() {
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        if (!mounted) return
         setSession(session)
         setUser(session?.user ?? null)
         if (session?.user) {
           await fetchProfile(session.user.id)
         } else {
-          setProfile(null)
+          setLoading(false)
         }
-        setLoading(false)
+      } catch (err) {
+        console.error('Auth init error:', err)
+        if (mounted) setLoading(false)
+      }
+    }
+
+    initialize()
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        if (!mounted) return
+        console.log('Auth state change:', event, !!session)
+        if (event === 'SIGNED_IN' && session?.user) {
+          setSession(session)
+          setUser(session.user)
+          // Small delay to ensure session is fully set before querying
+          await new Promise(resolve => setTimeout(resolve, 500))
+          if (mounted) {
+            await fetchProfile(session.user.id)
+          }
+        } else if (event === 'TOKEN_REFRESHED' && session?.user) {
+          setSession(session)
+          setUser(session.user)
+          setLoading(false)
+        } else if (event === 'SIGNED_OUT') {
+          setSession(null)
+          setUser(null)
+          setProfile(null)
+          setLoading(false)
+        } else if (event === 'INITIAL_SESSION') {
+          // Handled by getSession() in initialize()
+        }
       }
     )
 
-    return () => subscription.unsubscribe()
+    return () => {
+      mounted = false
+      subscription.unsubscribe()
+    }
   }, [fetchProfile])
 
   const signOut = async () => {
     await supabase.auth.signOut()
-    setUser(null)
-    setProfile(null)
-    setSession(null)
   }
 
   return (
