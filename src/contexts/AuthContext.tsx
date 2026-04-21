@@ -41,13 +41,34 @@ const AuthContext = createContext<AuthContextType>({
   refreshProfile: async () => {},
 })
 
+const CACHE_KEY = 'hap-profile-v1'
+
+const getCache = (): Profile | null => {
+  try {
+    const c = localStorage.getItem(CACHE_KEY)
+    return c ? JSON.parse(c) : null
+  } catch { return null }
+}
+
+const saveCache = (p: Profile | null) => {
+  try {
+    if (p) localStorage.setItem(CACHE_KEY, JSON.stringify(p))
+    else localStorage.removeItem(CACHE_KEY)
+  } catch {}
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
-  const [profile, setProfile] = useState<Profile | null>(null)
+  const [profile, setProfile] = useState<Profile | null>(getCache())
   const [session, setSession] = useState<Session | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(!getCache())
 
   const fetchingForRef = useRef<string | null>(null)
+
+  const updateProfile = useCallback((p: Profile | null) => {
+    setProfile(p)
+    saveCache(p)
+  }, [])
 
   const fetchProfile = useCallback(async (userId: string) => {
     if (fetchingForRef.current === userId) {
@@ -69,7 +90,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .maybeSingle()
       console.log('fetchProfile result:', { hasData: !!data, error })
       if (data) {
-        setProfile(data as Profile)
+        updateProfile(data as Profile)
       }
     } catch (err) {
       console.error('fetchProfile error:', err)
@@ -77,7 +98,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       fetchingForRef.current = null
       setLoading(false)
     }
-  }, [])
+  }, [updateProfile])
 
   const refreshProfile = useCallback(async () => {
     if (user?.id) {
@@ -141,7 +162,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           lastEventRef.current = 'SIGNED_OUT'
           setSession(null)
           setUser(null)
-          setProfile(null)
+          updateProfile(null)
           setLoading(false)
         } else if (event === 'INITIAL_SESSION') {
           lastEventRef.current = 'INITIAL_SESSION'
@@ -155,7 +176,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       mounted = false
       subscription.unsubscribe()
     }
-  }, [fetchProfile])
+  }, [fetchProfile, updateProfile])
 
   const signOut = async () => {
     await supabase.auth.signOut()

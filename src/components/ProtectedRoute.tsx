@@ -4,8 +4,9 @@ import { useAuth } from '../contexts/AuthContext'
 import { LoadingScreen } from './LoadingScreen'
 
 export function ProtectedRoute({ children }: { children: ReactNode }) {
-  const { user, loading } = useAuth()
+  const { user, profile, loading } = useAuth()
 
+  if (loading && profile) return <>{children}</>
   if (loading) return <LoadingScreen />
   if (!user) return <Navigate to="/" replace />
 
