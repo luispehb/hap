@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
@@ -6,6 +7,7 @@ import { Chip } from '../components/ui/Chip'
 import { Button } from '../components/ui/Button'
 import { BottomNav } from '../components/ui/BottomNav'
 import { getProfilePhoto } from '../lib/photos'
+import { supabase } from '../lib/supabase'
 
 const ALL_INTERESTS = [
   'architecture', 'gastronomy', 'nature', 'music', 'literature',
@@ -44,6 +46,19 @@ function formatTripDates(start: string | null, end: string | null): string {
   return `Since ${fmt(start!)}`
 }
 
+function getSocialUrl(platform: string, handle: string): string {
+  const map: Record<string, string> = {
+    instagram: `https://instagram.com/${handle}`,
+    linkedin: `https://linkedin.com/in/${handle}`,
+    whatsapp: `https://wa.me/${handle}`,
+    telegram: `https://t.me/${handle}`,
+    website: handle,
+    substack: `https://${handle}.substack.com`,
+    spotify: `https://open.spotify.com/user/${handle}`,
+  }
+  return map[platform] ?? handle
+}
+
 export function Profile() {
   const { id } = useParams<{ id?: string }>()
   const navigate = useNavigate()
@@ -54,6 +69,73 @@ export function Profile() {
 
   const profile = isOwnProfile ? ownProfile : fetchedProfile.profile
   const loading = isOwnProfile ? false : fetchedProfile.loading
+
+  const [connection, setConnection] = useState<Record<string, unknown> | null>(null)
+  const [connecting, setConnecting] = useState(false)
+  const [toast, setToast] = useState('')
+  const [pendingCount, setPendingCount] = useState(0)
+
+  function showToast(msg: string) {
+    setToast(msg)
+    setTimeout(() => setToast(''), 2500)
+  }
+
+  useEffect(() => {
+    if (isOwnProfile || !ownProfile?.id || !id) return
+    supabase
+      .from('connections')
+      .select('*')
+      .or(`and(user_a_id.eq.${ownProfile.id},user_b_id.eq.${id}),and(user_a_id.eq.${id},user_b_id.eq.${ownProfile.id})`)
+      .maybeSingle()
+      .then(({ data }) => setConnection(data))
+  }, [isOwnProfile, ownProfile?.id, id])
+
+  useEffect(() => {
+    if (!isOwnProfile || !ownProfile?.id) return
+    supabase
+      .from('connections')
+      .select('id', { count: 'exact' })
+      .eq('user_b_id', ownProfile.id)
+      .eq('user_b_wants_connect', false)
+      .eq('user_a_wants_connect', true)
+      .then(({ count }) => setPendingCount(count || 0))
+  }, [isOwnProfile, ownProfile?.id])
+
+  const handleConnect = async () => {
+    if (!ownProfile?.id || !id) return
+    setConnecting(true)
+    const { data, error } = await supabase
+      .from('connections')
+      .insert({
+        user_a_id: ownProfile.id,
+        user_b_id: id,
+        user_a_wants_connect: true,
+        user_b_wants_connect: false,
+      })
+      .select()
+      .single()
+    if (!error) {
+      setConnection(data)
+      showToast('Connection request sent ✓')
+    }
+    setConnecting(false)
+  }
+
+  const handleAccept = async () => {
+    if (!connection?.id) return
+    await supabase
+      .from('connections')
+      .update({ user_b_wants_connect: true })
+      .eq('id', connection.id)
+    setConnection({ ...connection, user_b_wants_connect: true })
+    showToast('Connected! 🎉')
+  }
+
+  const handleDecline = async () => {
+    if (!connection?.id) return
+    await supabase.from('connections').delete().eq('id', connection.id)
+    setConnection(null)
+  }
 
   if (loading || !profile) {
     return (
@@ -159,21 +241,43 @@ export function Profile() {
           ))}
         </div>
 
-        {/* Journal link */}
+        {/* Journal + Connections links */}
         {isOwnProfile && (
-          <button
-            onClick={() => navigate('/journal')}
-            className="w-full bg-white border border-[#E8E4DC] rounded-2xl p-4 flex items-center justify-between active:bg-sand transition cursor-pointer"
-          >
-            <div className="flex items-center gap-3">
-              <span className="text-xl">📖</span>
-              <div className="text-left">
-                <p className="text-ink font-bold text-sm">Hap Journal</p>
-                <p className="text-muted text-xs">Your travel connections</p>
+          <>
+            <button
+              onClick={() => navigate('/journal')}
+              className="w-full bg-white border border-[#E8E4DC] rounded-2xl p-4 flex items-center justify-between active:bg-sand transition cursor-pointer"
+            >
+              <div className="flex items-center gap-3">
+                <span className="text-xl">📖</span>
+                <div className="text-left">
+                  <p className="text-ink font-bold text-sm">Hap Journal</p>
+                  <p className="text-muted text-xs">Your travel connections</p>
+                </div>
               </div>
-            </div>
-            <ChevronRight size={16} className="text-muted" />
-          </button>
+              <ChevronRight size={16} className="text-muted" />
+            </button>
+            <button
+              onClick={() => navigate('/connections')}
+              className="w-full bg-white border border-[#E8E4DC] rounded-2xl p-4 flex items-center justify-between active:bg-sand transition cursor-pointer"
+            >
+              <div className="flex items-center gap-3">
+                <span className="text-xl">🤝</span>
+                <div className="text-left">
+                  <p className="text-ink font-bold text-sm">Connections</p>
+                  <p className="text-muted text-xs">People you've met on Hap</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                {pendingCount > 0 && (
+                  <span className="bg-sky text-white text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center">
+                    {pendingCount}
+                  </span>
+                )}
+                <ChevronRight size={16} className="text-muted" />
+              </div>
+            </button>
+          </>
         )}
 
         {/* Trip card */}
@@ -229,8 +333,8 @@ export function Profile() {
           </div>
         </div>
 
-        {/* Social links */}
-        {activeSocialPlatforms.length > 0 && (
+        {/* Social links — own profile always visible; other profile only when connected */}
+        {(isOwnProfile ? activeSocialPlatforms.length > 0 : false) && (
           <div>
             <p className="text-[10px] font-bold text-muted uppercase tracking-widest mb-2">
               Connect outside Hap
@@ -248,6 +352,68 @@ export function Profile() {
             </div>
           </div>
         )}
+
+        {/* Connection state UI — shown for other profiles */}
+        {!isOwnProfile && (() => {
+          const isConnected = connection?.user_a_wants_connect && connection?.user_b_wants_connect
+          const isViewerB = connection?.user_b_id === ownProfile?.id
+          const isPendingForViewer = connection && !connection.user_b_wants_connect && isViewerB
+
+          if (isConnected) {
+            return (
+              <>
+                <div className="bg-[#F0FFF6] border border-green-200 rounded-2xl p-4">
+                  <p className="text-green-700 font-bold text-center text-sm">✓ You're connected</p>
+                  <p className="text-green-500 text-xs text-center mt-1">Good things happen.</p>
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold text-muted uppercase tracking-widest mb-2">
+                    Connect outside Hap
+                  </p>
+                  {activeSocialPlatforms.length > 0 ? (
+                    <div className="flex flex-col gap-2">
+                      {activeSocialPlatforms.map(([platform, handle]) => (
+                        <button
+                          key={platform}
+                          onClick={() => window.open(getSocialUrl(platform, handle), '_blank')}
+                          className="bg-white border border-[#E8E4DC] rounded-xl px-3 py-2.5 flex items-center gap-2 cursor-pointer active:bg-sand transition text-left"
+                        >
+                          <span>{SOCIAL_EMOJIS[platform] ?? '🔗'}</span>
+                          <span className="text-xs font-bold text-ink capitalize">{platform}</span>
+                          <span className="text-xs text-muted ml-1">{handle}</span>
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-muted text-xs text-center py-2">
+                      {profile.display_name} hasn't added social links yet
+                    </p>
+                  )}
+                </div>
+              </>
+            )
+          }
+
+          if (isPendingForViewer) {
+            return (
+              <div className="bg-white border border-[#E8E4DC] rounded-2xl p-4 mb-4">
+                <p className="text-ink font-bold text-sm text-center mb-3">
+                  {profile.display_name} wants to connect with you
+                </p>
+                <div className="flex gap-2">
+                  <Button variant="outline" size="lg" fullWidth onClick={handleDecline}>
+                    Decline
+                  </Button>
+                  <Button variant="cta" size="lg" fullWidth onClick={handleAccept}>
+                    Accept
+                  </Button>
+                </div>
+              </div>
+            )
+          }
+
+          return null
+        })()}
       </div>
 
       {isOwnProfile
@@ -263,16 +429,42 @@ export function Profile() {
           </>
         )
         : (
-          <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[430px] bg-cream border-t border-[#EAE6DF] px-4 pt-3 pb-8">
-            <div className="flex gap-2">
-              <Button variant="outline" size="lg" onClick={() => navigate(-1)}>Pass</Button>
-              <div className="flex-1">
-                <Button variant="primary" size="lg" fullWidth onClick={() => alert('Connect flow — Phase 6')}>
-                  Connect
-                </Button>
+          <>
+            {toast && (
+              <div className="fixed bottom-24 left-1/2 -translate-x-1/2 bg-ink text-white text-xs font-bold px-5 py-3 rounded-xl z-50 whitespace-nowrap shadow-lg">
+                {toast}
               </div>
-            </div>
-          </div>
+            )}
+            {(() => {
+              const isConnected = connection?.user_a_wants_connect && connection?.user_b_wants_connect
+              const isViewerA = connection?.user_a_id === ownProfile?.id
+              const isPendingSent = connection && !connection.user_b_wants_connect && isViewerA
+              const isViewerB = connection?.user_b_id === ownProfile?.id
+              const isPendingForViewer = connection && !connection.user_b_wants_connect && isViewerB
+
+              if (isConnected) return null
+              if (isPendingForViewer) return null
+
+              return (
+                <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[430px] bg-cream border-t border-[#EAE6DF] px-4 pt-3 pb-8">
+                  <div className="flex gap-2">
+                    <Button variant="outline" size="lg" onClick={() => navigate(-1)}>Pass</Button>
+                    <div className="flex-1">
+                      {isPendingSent ? (
+                        <Button variant="primary" size="lg" fullWidth disabled>
+                          Request sent ✓
+                        </Button>
+                      ) : (
+                        <Button variant="primary" size="lg" fullWidth onClick={handleConnect} disabled={connecting}>
+                          {connecting ? 'Sending…' : 'Connect'}
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )
+            })()}
+          </>
         )
       }
     </div>

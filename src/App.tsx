@@ -13,6 +13,7 @@ import { Profile } from './screens/Profile'
 import { Chat } from './screens/Chat'
 import { Rating } from './screens/Rating'
 import { Journal } from './screens/Journal'
+import { Connections } from './screens/Connections'
 
 function App() {
   return (
@@ -34,6 +35,7 @@ function App() {
               <Route path="/chat/:planId" element={<ProtectedRoute><Chat /></ProtectedRoute>} />
               <Route path="/rate/:planId" element={<ProtectedRoute><Rating /></ProtectedRoute>} />
               <Route path="/journal" element={<ProtectedRoute><Journal /></ProtectedRoute>} />
+              <Route path="/connections" element={<ProtectedRoute><Connections /></ProtectedRoute>} />
               <Route path="/chats" element={
                 <ProtectedRoute>
                   <div className="min-h-screen bg-cream flex items-center justify-center">
