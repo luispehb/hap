@@ -48,7 +48,7 @@ export function Splash() {
   }
 
   async function handleVerifyOTP() {
-    if (otp.length !== 8) return
+    if (otp.length !== 6) return
     setOtpLoading(true)
     setOtpError('')
     const { error } = await supabase.auth.verifyOtp({
@@ -120,19 +120,19 @@ export function Splash() {
           <div className="flex flex-col gap-3 w-full">
             <div className="text-center mb-1">
               <p className="text-white font-bold text-sm">Check your email</p>
-              <p className="text-white/40 text-xs mt-1">We sent an 8-digit code to {email}</p>
+              <p className="text-white/40 text-xs mt-1">We sent a 6-digit code to {email}</p>
             </div>
 
             <input
               type="number"
               inputMode="numeric"
               pattern="[0-9]*"
-              placeholder="Enter 8-digit code"
+              placeholder="Enter 6-digit code"
               value={otp}
               onChange={e => {
-                const val = e.target.value.slice(0, 8)
+                const val = e.target.value.slice(0, 6)
                 setOtp(val)
-                if (val.length === 8) {
+                if (val.length === 6) {
                   setTimeout(() => handleVerifyOTP(), 100)
                 }
               }}
@@ -146,7 +146,7 @@ export function Splash() {
 
             <button
               onClick={handleVerifyOTP}
-              disabled={otp.length !== 8 || otpLoading}
+              disabled={otp.length !== 6 || otpLoading}
               className="w-full bg-sky text-white font-bold py-3.5 rounded-xl text-sm disabled:opacity-40 active:opacity-80 transition cursor-pointer"
             >
               {otpLoading ? 'Verifying...' : 'Enter Hap →'}
