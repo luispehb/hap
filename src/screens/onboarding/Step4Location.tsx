@@ -22,7 +22,7 @@ export function Step4Location() {
   const [selectedCity, setSelectedCity] = useState('')
   const [showDropdown, setShowDropdown] = useState(false)
   const [arrival, setArrival] = useState('')
-  const [departur setDeparture] = useState('')
+  const [departure, setDeparture] = useState('')
   const [loading, setLoading] = useState(false)
   const [errorMsg, setErrorMsg] = useState('')
 
