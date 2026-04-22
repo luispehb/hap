@@ -15,7 +15,10 @@ export function useProfiles(currentCity: string, viewerInterests: string[], excl
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    if (!currentCity) return
+    if (!currentCity) {
+      setLoading(false)
+      return
+    }
     let cancelled = false
     setLoading(true)
     setError(null)
