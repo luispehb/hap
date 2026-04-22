@@ -177,6 +177,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           }
           lastEventRef.current = 'SIGNED_IN'
           if (session?.user) {
+            setLoading(true)
             setSession(session)
             setUser(session.user)
             await new Promise(r => setTimeout(r, 500))
