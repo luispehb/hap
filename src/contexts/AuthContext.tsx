@@ -64,37 +64,61 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(!getCache())
 
   const fetchingForRef = useRef<string | null>(null)
+  // Track how many times we've retried for a user with no profile found
+  const retryCountRef = useRef<number>(0)
 
   const updateProfile = useCallback((p: Profile | null) => {
     setProfile(p)
     saveCache(p)
   }, [])
 
-  const fetchProfile = useCallback(async (userId: string) => {
-    if (fetchingForRef.current === userId) {
+  const fetchProfile = useCallback(async (userId: string, isRetry = false) => {
+    if (!isRetry && fetchingForRef.current === userId) {
       console.log('fetchProfile already in progress for:', userId)
       return
     }
     fetchingForRef.current = userId
     try {
-      console.log('fetchProfile called for:', userId)
-      // No client-side timeout — let Supabase respond naturally.
-      // Cold starts on the free tier can take 20-30s; a hard timeout
-      // causes the profile to arrive after loading=false, triggering a
-      // spurious redirect to /onboarding. The 30s failsafe in initialize()
-      // is the safety net if the DB never responds.
+      console.log('fetchProfile called for:', userId, isRetry ? '(retry)' : '')
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
         .eq('user_id', userId)
         .maybeSingle()
+
       console.log('fetchProfile result:', { hasData: !!data, error })
+
       if (data) {
+        // Profile found — save it and mark loading done
+        retryCountRef.current = 0
         updateProfile(data as Profile)
+        fetchingForRef.current = null
+        setLoading(false)
+      } else if (error) {
+        // Real DB error — don't redirect to onboarding, just unblock
+        console.error('fetchProfile DB error:', error)
+        fetchingForRef.current = null
+        setLoading(false)
+      } else {
+        // data=null, no error — profile genuinely doesn't exist OR Supabase
+        // cold-start returned empty. Retry up to 3 times with backoff before
+        // concluding this is a new user and sending to onboarding.
+        fetchingForRef.current = null
+        if (retryCountRef.current < 3) {
+          retryCountRef.current++
+          const delay = retryCountRef.current * 2000 // 2s, 4s, 6s
+          console.log(`Profile not found, retry ${retryCountRef.current}/3 in ${delay}ms`)
+          setTimeout(() => fetchProfile(userId, true), delay)
+          // Keep loading=true during retries so UI stays on spinner
+        } else {
+          // After 3 retries still nothing → genuinely new user → onboarding
+          console.log('Profile not found after retries, sending to onboarding')
+          retryCountRef.current = 0
+          setLoading(false)
+        }
       }
     } catch (err) {
       console.error('fetchProfile error:', err)
-    } finally {
       fetchingForRef.current = null
       setLoading(false)
     }
@@ -109,14 +133,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let mounted = true
 
-    // Absolute last resort: if Supabase never responds, unblock the UI.
+    // Absolute last resort: if Supabase never responds in 45s, unblock the UI.
     const failsafe = setTimeout(() => {
       if (mounted) {
-        console.warn('Auth init: 30s failsafe triggered')
+        console.warn('Auth init: 45s failsafe triggered')
         fetchingForRef.current = null
         setLoading(false)
       }
-    }, 30000)
+    }, 45000)
 
     async function initialize() {
       try {
@@ -163,12 +187,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setSession(null)
           setUser(null)
           updateProfile(null)
+          retryCountRef.current = 0
           setLoading(false)
         } else if (event === 'INITIAL_SESSION') {
           lastEventRef.current = 'INITIAL_SESSION'
           // Already handled by initialize()
         }
-        // TOKEN_REFRESHED and other events intentionally ignored
       }
     )
 
