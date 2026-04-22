@@ -22,7 +22,7 @@ export function Step4Location() {
   const [selectedCity, setSelectedCity] = useState('')
   const [showDropdown, setShowDropdown] = useState(false)
   const [arrival, setArrival] = useState('')
-  const [departure, setDeparture] = useState('')
+  const [departure, seeparture] = useState('')
   const [loading, setLoading] = useState(false)
   const [errorMsg, setErrorMsg] = useState('')
 
@@ -41,27 +41,16 @@ export function Step4Location() {
   const canContinue = selectedCity.length > 0
 
   async function handleEnter() {
-    if (!user || !selectedCity) {
-      console.error('Missing user or city:', { userId: user?.id, selectedCity })
-      return
-    }
-
+    if (!user || !selectedCity) return
     setLoading(true)
     setErrorMsg('')
-
     const stored = onboardingStore.get()
-    console.log('Saving profile for user:', user.id)
-    console.log('Stored data:', stored)
-    console.log('City:', selectedCity, 'isLocal:', mode === 'local')
-
     try {
-      const upsertPromise = supabase
+      const { error } = await supabase
         .from('profiles')
         .upsert({
           user_id: user.id,
-          display_name: stored.display_name ||
-            user.user_metadata?.full_name?.split(' ')[0] ||
-            user.email?.split('@')[0] || 'Traveler',
+          display_name: stored.display_name || user.user_metadata?.full_name?.split(' ')[0] || user.email?.split('@')[0] || 'Traveler',
           origin_city: stored.origin_city || '',
           current_city: selectedCity,
           is_local: mode === 'local',
@@ -74,21 +63,12 @@ export function Step4Location() {
           membership_status: 'trial',
         }, { onConflict: 'user_id' })
 
-      const timeoutPromise = new Promise<{ data: null; error: Error }>(resolve =>
-        setTimeout(() => resolve({ data: null, error: new Error('Saving timed out. Check your connection and try again.') }), 15000)
-      )
-
-      const { error } = await Promise.race([upsertPromise, timeoutPromise])
-
-      console.log('Upsert result - error:', error)
-
       if (error) {
         setErrorMsg(error.message)
         setLoading(false)
         return
       }
 
-      // Fire admissions insert without blocking navigation
       if (stored.bio_question) {
         supabase.from('admissions').insert({
           user_id: user.id,
@@ -120,16 +100,13 @@ export function Step4Location() {
       </h1>
       <p className="text-muted text-sm mb-6">This activates your feed.</p>
 
-      {/* Mode toggle */}
       <div className="flex bg-sand rounded-xl p-1 mb-6">
         {(['visiting', 'local'] as Mode[]).map(m => (
           <button
             key={m}
             onClick={() => setMode(m)}
             className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all cursor-pointer ${
-              mode === m
-                ? 'bg-white text-ink shadow-sm'
-                : 'text-muted'
+              mode === m ? 'bg-white text-ink shadow-sm' : 'text-muted'
             }`}
           >
             {m === 'visiting' ? "I'm visiting" : 'I live here'}
@@ -137,25 +114,19 @@ export function Step4Location() {
         ))}
       </div>
 
-      {/* City search */}
       <div className="relative">
         <div className="relative">
           <MapPin size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted" />
           <input
             type="text"
             value={cityInput}
-            onChange={e => {
-              setCityInput(e.target.value)
-              setSelectedCity('')
-              setShowDropdown(true)
-            }}
+            onChange={e => { setCityInput(e.target.value); setSelectedCity(''); setShowDropdown(true) }}
             onFocus={() => setShowDropdown(true)}
             onBlur={() => setTimeout(() => setShowDropdown(false), 150)}
             placeholder="Search city..."
             className="w-full bg-white border border-[#E8E4DC] rounded-xl pl-9 pr-4 py-3 text-sm text-ink placeholder:text-muted focus:outline-none focus:border-sky transition"
           />
         </div>
-
         {showDropdown && filtered.length > 0 && (
           <div className="absolute top-full left-0 right-0 bg-white border border-[#E8E4DC] rounded-xl mt-1 overflow-hidden z-10 shadow-sm">
             {filtered.map(city => (
@@ -171,45 +142,23 @@ export function Step4Location() {
         )}
       </div>
 
-      {/* Date range — only when visiting */}
       {mode === 'visiting' && (
         <div className="flex gap-3 mt-3">
           <div className="flex-1 flex flex-col gap-1">
-            <label className="text-[10px] font-bold uppercase tracking-wider text-muted pl-1">
-              Arrival
-            </label>
-            <input
-              type="date"
-              value={arrival}
-              onChange={e => setArrival(e.target.value)}
-              className="bg-white border border-[#E8E4DC] rounded-xl px-3 py-2.5 text-sm text-ink focus:outline-none focus:border-sky transition"
-            />
+            <label className="text-[10px] font-bold uppercase tracking-wider text-muted pl-1">Arrival</label>
+            <input type="date" value={arrival} onChange={e => setArrival(e.target.value)} className="bg-white border border-[#E8E4DC] rounded-xl px-3 py-2.5 text-sm text-ink focus:outline-none focus:border-sky transition" />
           </div>
           <div className="flex-1 flex flex-col gap-1">
-            <label className="text-[10px] font-bold uppercase tracking-wider text-muted pl-1">
-              Departure
-            </label>
-            <input
-              type="date"
-              value={departure}
-              onChange={e => setDeparture(e.target.value)}
-              className="bg-white border border-[#E8E4DC] rounded-xl px-3 py-2.5 text-sm text-ink focus:outline-none focus:border-sky transition"
-            />
+            <label className="text-[10px] font-bold uppercase tracking-wider text-muted pl-1">Departure</label>
+            <input type="date" value={departure} onChange={e => setDeparture(e.target.value)} className="bg-white border border-[#E8E4DC] rounded-xl px-3 py-2.5 text-sm text-ink focus:outline-none focus:border-sky transition" />
           </div>
         </div>
       )}
 
-      {errorMsg && (
-        <p className="text-red-500 text-xs font-bold text-center mt-4">{errorMsg}</p>
-      )}
+      {errorMsg && <p className="text-red-500 text-xs font-bold text-center mt-4">{errorMsg}</p>}
 
       <div className="mt-auto pt-8">
-        <Button
-          variant="cta"
-          fullWidth
-          disabled={!canContinue || loading}
-          onClick={handleEnter}
-        >
+        <Button variant="cta" fullWidth disabled={!canContinue || loading} onClick={handleEnter}>
           {loading ? 'Saving…' : 'Enter Hap →'}
         </Button>
       </div>
