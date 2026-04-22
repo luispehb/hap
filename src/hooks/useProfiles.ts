@@ -19,7 +19,7 @@ export function useProfiles(currentCity: string, viewerInterests: string[]) {
 
     async function fetchProfiles() {
       setError(null)
-      if (profiles.length === 0) setLoading(true)
+      setLoading(true)
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
