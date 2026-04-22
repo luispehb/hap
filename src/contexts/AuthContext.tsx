@@ -126,12 +126,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const failsafe = setTimeout(() => {
       if (mountedRef.current) {
-        console.warn('Auth init: 60s failsafe triggered')
+        console.warn('Auth init: failsafe triggered')
         fetchingForRef.current = null
-        // Solo desbloquear si no hay cache — si hay cache el usuario ya ve la app
-        if (!getCache()) setLoading(false)
+        setLoading(false)
       }
-    }, 60000)
+    }, 10000)
 
     async function initialize() {
       try {

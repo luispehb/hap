@@ -27,7 +27,7 @@ function getActivityGradient(type: string): string {
 export function Feed() {
   const navigate = useNavigate()
   const location = useLocation()
-  const { profile, user } = useAuth()
+  const { profile, user, loading: authLoading } = useAuth()
   const initialTab = (location.state as { tab?: 'people' | 'plans' } | null)?.tab ?? 'people'
 
   const [activeTab, setActiveTab] = useState<'people' | 'plans'>(initialTab)
@@ -62,8 +62,6 @@ export function Feed() {
   const { profiles, loading: profilesLoading, error } = useProfiles(viewerCity, viewerInterests, user?.id)
   const { plans, loading: plansLoading } = usePlans(viewerCity)
 
-  if (!user) return <Navigate to="/" replace />
-
   if (!profile) {
     return (
       <div className="min-h-screen bg-cream flex items-center justify-center flex-col gap-4 px-6">
@@ -72,6 +70,8 @@ export function Feed() {
       </div>
     )
   }
+
+  if (!user && !authLoading) return <Navigate to="/" replace />
 
   const visibleProfiles = profiles.filter(p => !dismissed.includes(p.id))
 
