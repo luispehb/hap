@@ -25,6 +25,11 @@ const SOCIAL_EMOJIS: Record<string, string> = {
   spotify: '🎵',
 }
 
+function randomCode(): string {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
+  return Array.from({ length: 8 }, () => chars[Math.floor(Math.random() * chars.length)]).join('')
+}
+
 function getDaysLabel(tripEndDate: string | null, isLocal: boolean): string {
   if (isLocal) return 'Local'
   if (!tripEndDate) return 'Traveler'
@@ -63,7 +68,7 @@ function getSocialUrl(platform: string, handle: string): string {
 export function Profile() {
   const { id } = useParams<{ id?: string }>()
   const navigate = useNavigate()
-  const { profile: ownProfile, signOut } = useAuth()
+  const { profile: ownProfile, signOut, user } = useAuth()
   const isOwnProfile = !id
 
   const fetchedProfile = useProfile(id ?? '')
@@ -76,6 +81,10 @@ export function Profile() {
   const [toast, setToast] = useState('')
   const [pendingCount, setPendingCount] = useState(0)
   const [photoIndex, setPhotoIndex] = useState(0)
+  const [inviteCode, setInviteCode] = useState<string | null>(null)
+  const [inviteCount, setInviteCount] = useState(0)
+  const [inviteCopied, setInviteCopied] = useState(false)
+  const [generatingInvite, setGeneratingInvite] = useState(false)
 
   function showToast(msg: string) {
     setToast(msg)
@@ -102,6 +111,15 @@ export function Profile() {
       .eq('user_a_wants_connect', true)
       .then(({ count }) => setPendingCount(count || 0))
   }, [isOwnProfile, ownProfile?.id])
+
+  useEffect(() => {
+    if (!isOwnProfile || !user?.id) return
+    supabase
+      .from('invitations')
+      .select('id', { count: 'exact' })
+      .eq('inviter_id', user.id)
+      .then(({ count }) => setInviteCount(count || 0))
+  }, [isOwnProfile, user?.id])
 
   const handleConnect = async () => {
     if (!ownProfile?.id || !id) return
@@ -137,6 +155,27 @@ export function Profile() {
     if (!connection?.id) return
     await supabase.from('connections').delete().eq('id', connection.id)
     setConnection(null)
+  }
+
+  const handleGenerateInvite = async () => {
+    if (!user?.id || inviteCount >= 3 || generatingInvite) return
+    setGeneratingInvite(true)
+    const code = randomCode()
+    const { error } = await supabase
+      .from('invitations')
+      .insert({ inviter_id: user.id, code })
+    if (!error) {
+      setInviteCode(code)
+      setInviteCount(c => c + 1)
+    }
+    setGeneratingInvite(false)
+  }
+
+  const handleCopyLink = () => {
+    if (!inviteCode) return
+    navigator.clipboard.writeText(`https://hop-chi.vercel.app/invite/${inviteCode}`)
+    setInviteCopied(true)
+    setTimeout(() => setInviteCopied(false), 2000)
   }
 
   if (loading || !profile) {
@@ -294,6 +333,44 @@ export function Profile() {
             <p className="text-white/50 text-[10px] mt-0.5">Rating — · 0 no-shows</p>
           </div>
         </div>
+
+        {/* Invite a friend — own profile only */}
+        {isOwnProfile && (
+          <div>
+            <p className="text-[10px] font-bold text-muted uppercase tracking-widest mb-2">
+              Invite a friend
+            </p>
+            <div className="bg-white border border-[#E8E4DC] rounded-2xl p-4">
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-ink text-sm font-bold">Invite link</p>
+                <p className="text-[10px] text-muted font-bold">{inviteCount}/3 used</p>
+              </div>
+              {inviteCode ? (
+                <div className="flex flex-col gap-2">
+                  <div className="bg-sand rounded-xl px-3 py-2">
+                    <p className="text-ink text-xs font-mono break-all">
+                      https://hop-chi.vercel.app/invite/{inviteCode}
+                    </p>
+                  </div>
+                  <button
+                    onClick={handleCopyLink}
+                    className="w-full bg-ink text-white rounded-xl py-2.5 text-xs font-bold active:opacity-80 transition cursor-pointer"
+                  >
+                    {inviteCopied ? 'Copied ✓' : 'Copy link'}
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={handleGenerateInvite}
+                  disabled={inviteCount >= 3 || generatingInvite}
+                  className="w-full bg-ink text-white rounded-xl py-2.5 text-xs font-bold disabled:opacity-40 active:opacity-80 transition cursor-pointer"
+                >
+                  {generatingInvite ? 'Generating…' : inviteCount >= 3 ? 'No invites left' : 'Generate invite link'}
+                </button>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Stats row */}
         <div className="grid grid-cols-3 gap-3">

@@ -80,6 +80,18 @@ export function Step4Location() {
       }
 
       onboardingStore.clear()
+
+      const pendingInviteCode = sessionStorage.getItem('hapInviteCode')
+      if (pendingInviteCode) {
+        sessionStorage.removeItem('hapInviteCode')
+        supabase
+          .from('invitations')
+          .update({ used: true, used_by: user.id })
+          .eq('code', pendingInviteCode)
+          .eq('used', false)
+          .then(({ error }) => { if (error) console.error('Failed to mark invite used:', error) })
+      }
+
       navigate('/feed', { replace: true })
       refreshProfile()
 
