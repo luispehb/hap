@@ -20,6 +20,17 @@ export function Splash() {
     else if (user && !profile) navigate('/onboarding', { replace: true })
   }, [user, profile, loading, navigate])
 
+  // Tiene sesión pero el perfil aún no llegó de Supabase → esperar
+  if (loading && user) return (
+    <div className="min-h-screen bg-cream flex items-center justify-center flex-col gap-4 px-8">
+      <span className="text-[40px] font-extrabold text-ink tracking-[-2px]">
+        hap<span className="inline-block w-2.5 h-2.5 rounded-full bg-sky ml-1 mb-1.5" />
+      </span>
+      <div className="w-5 h-5 border-2 border-sky border-t-transparent rounded-full animate-spin" />
+      <p className="text-muted text-sm text-center">Loading your profile...</p>
+    </div>
+  )
+
   if (loading) return <LoadingScreen />
 
   async function handleGoogleSignIn() {

@@ -9,6 +9,7 @@ export function ProtectedRoute({ children }: { children: ReactNode }) {
   if (loading && profile) return <>{children}</>
   if (loading) return <LoadingScreen />
   if (!user) return <Navigate to="/" replace />
+  if (user && !profile) return <LoadingScreen />
 
   return <>{children}</>
 }

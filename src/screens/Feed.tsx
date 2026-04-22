@@ -70,17 +70,8 @@ export function Feed() {
   if (!profile) {
     return (
       <div className="min-h-screen bg-cream flex items-center justify-center flex-col gap-4 px-6">
-        <p className="text-3xl">✦</p>
-        <p className="text-ink font-extrabold text-lg text-center tracking-tight">
-          Setting up your profile...
-        </p>
-        <p className="text-muted text-sm text-center">This usually takes a second</p>
-        <button
-          onClick={() => navigate('/onboarding')}
-          className="mt-2 bg-ink text-white font-bold px-6 py-3 rounded-xl text-sm cursor-pointer active:opacity-80 transition"
-        >
-          Complete profile →
-        </button>
+        <div className="w-6 h-6 border-2 border-sky border-t-transparent rounded-full animate-spin" />
+        <p className="text-muted text-sm text-center">Loading your profile...</p>
       </div>
     )
   }
@@ -269,20 +260,15 @@ export function Feed() {
                       className="h-[100px] relative flex items-center justify-center"
                       style={{ background: getActivityGradient(plan.activity_type) }}
                     >
-                      {/* Emoji centered in upper area */}
                       <span className="text-4xl relative z-10 mb-8">
                         {getActivityEmoji(plan.activity_type)}
                       </span>
-
-                      {/* Dark gradient overlay at bottom */}
                       <div
                         className="absolute inset-0 z-20"
                         style={{
                           background: 'linear-gradient(to top, rgba(0,0,0,0.65) 0%, rgba(0,0,0,0.1) 50%, transparent 100%)',
                         }}
                       />
-
-                      {/* Text overlay - bottom only */}
                       <div className="absolute bottom-0 left-0 right-0 px-3 pb-2.5 z-30">
                         <p className="text-white font-extrabold text-sm tracking-tight leading-tight">
                           {plan.title}
