@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react'
-import { supabase } from '../lib/supabase'
+import { supabaseReady, supabaseRestHeaders, supabaseRestUrl } from '../lib/supabase'
 export type { Profile } from '../contexts/AuthContext'
 import type { Profile } from '../contexts/AuthContext'
 
 function computeAffinity(profileInterests: string[], viewerInterests: string[]): number {
-  if (!viewerInterests.length) return 0
+  if (!Array.isArray(profileInterests) || !viewerInterests.length) return 0
   const matches = profileInterests.filter(i => viewerInterests.includes(i)).length
   return Math.round((matches / viewerInterests.length) * 100)
 }
@@ -16,38 +16,67 @@ export function useProfiles(currentCity: string, viewerInterests: string[], excl
 
   useEffect(() => {
     if (!currentCity) {
+      setProfiles([])
+      setError(null)
       setLoading(false)
       return
     }
+
     let cancelled = false
+    const controller = new AbortController()
     setLoading(true)
     setError(null)
 
-    console.log('[useProfiles] querying city:', JSON.stringify(currentCity), 'excludeUserId:', excludeUserId)
+    async function fetchProfiles() {
+      try {
+        if (!supabaseReady || !supabaseRestHeaders) {
+          throw new Error('Supabase is not configured')
+        }
 
-    let query = supabase
-      .from('profiles')
-      .select('*')
-      .eq('current_city', currentCity)
-      .order('trust_score', { ascending: false })
+        const params = new URLSearchParams({
+          select: '*',
+          current_city: `eq.${currentCity}`,
+          order: 'trust_score.desc',
+        })
 
-    if (excludeUserId) {
-      query = query.neq('user_id', excludeUserId)
+        if (excludeUserId) {
+          params.set('user_id', `neq.${excludeUserId}`)
+        }
+
+        const response = await fetch(`${supabaseRestUrl}/profiles?${params.toString()}`, {
+          headers: supabaseRestHeaders,
+          signal: controller.signal,
+        })
+
+        if (!response.ok) {
+          throw new Error(`Profiles request failed (${response.status})`)
+        }
+
+        const data = await response.json() as Profile[]
+
+        if (cancelled) return
+
+        const sorted = (data || []).sort((a, b) =>
+          computeAffinity(b.interests, viewerInterests) - computeAffinity(a.interests, viewerInterests)
+        )
+
+        setProfiles(sorted)
+      } catch (err) {
+        if (cancelled) return
+        if (err instanceof Error && err.name === 'AbortError') return
+        setError(err instanceof Error ? err.message : 'Failed to load profiles')
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
     }
 
-    query.then(({ data, error: err }) => {
-      if (cancelled) return
-      console.log('[useProfiles] result:', data?.length ?? 0, 'profiles, error:', err?.message)
-      if (err) { setError(err.message); setLoading(false); return }
-      const sorted = (data as Profile[] || []).sort((a, b) =>
-        computeAffinity(b.interests, viewerInterests) - computeAffinity(a.interests, viewerInterests)
-      )
-      setProfiles(sorted)
-      setLoading(false)
-    })
+    fetchProfiles()
 
-    return () => { cancelled = true }
-  }, [currentCity, excludeUserId])
+    return () => {
+      cancelled = true
+      controller.abort()
+    }
+  }, [currentCity, excludeUserId, viewerInterests])
 
   return { profiles, loading, error }
 }

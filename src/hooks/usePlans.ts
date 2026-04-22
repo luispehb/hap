@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { supabase } from '../lib/supabase'
+import { supabaseReady, supabaseRestHeaders, supabaseRestUrl } from '../lib/supabase'
 
 export interface Plan {
   id: string
@@ -33,20 +33,53 @@ export function usePlans(city: string) {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    async function fetchPlans() {
-      const now = new Date().toISOString()
-      const { data } = await supabase
-        .from('plans')
-        .select('*')
-        .eq('city', city)
-        .eq('status', 'open')
-        .gt('scheduled_at', now)
-        .order('scheduled_at', { ascending: true })
-
-      setPlans(data || [])
+    if (!city) {
+      setPlans([])
       setLoading(false)
+      return
     }
+
+    const controller = new AbortController()
+
+    async function fetchPlans() {
+      try {
+        setLoading(true)
+
+        if (!supabaseReady || !supabaseRestHeaders) {
+          throw new Error('Supabase is not configured')
+        }
+
+        const now = new Date().toISOString()
+        const params = new URLSearchParams({
+          select: '*',
+          city: `eq.${city}`,
+          status: 'eq.open',
+          scheduled_at: `gt.${now}`,
+          order: 'scheduled_at.asc',
+        })
+
+        const response = await fetch(`${supabaseRestUrl}/plans?${params.toString()}`, {
+          headers: supabaseRestHeaders,
+          signal: controller.signal,
+        })
+
+        if (!response.ok) {
+          throw new Error(`Plans request failed (${response.status})`)
+        }
+
+        const data = await response.json() as Plan[]
+        setPlans(data || [])
+      } catch (err) {
+        if (err instanceof Error && err.name === 'AbortError') return
+        setPlans([])
+      } finally {
+        setLoading(false)
+      }
+    }
+
     fetchPlans()
+
+    return () => controller.abort()
   }, [city])
 
   return { plans, loading }

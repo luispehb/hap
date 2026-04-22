@@ -24,3 +24,10 @@ export const supabase = isConfigured
   : createClient('https://placeholder.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSJ9.placeholder', authOptions)
 
 export const supabaseReady = Boolean(isConfigured)
+export const supabaseRestUrl = isConfigured ? `${supabaseUrl}/rest/v1` : ''
+export const supabaseRestHeaders = isConfigured
+  ? {
+      apikey: supabaseAnonKey,
+      Authorization: `Bearer ${supabaseAnonKey}`,
+    }
+  : null
