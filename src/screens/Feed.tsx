@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate, useLocation, Navigate } from 'react-router-dom'
 import { useProfiles } from '../hooks/useProfiles'
 import { usePlans, getActivityEmoji } from '../hooks/usePlans'
@@ -37,20 +37,6 @@ export function Feed() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null)
 
-  // Estabilizar city e interests para evitar re-fetches innecesarios
-  const cityRef = useRef('')
-  const interestsRef = useRef<string[]>([])
-
-  if (profile?.current_city && profile.current_city !== cityRef.current) {
-    cityRef.current = profile.current_city
-  }
-  if (profile?.interests?.length && interestsRef.current.length === 0) {
-    interestsRef.current = profile.interests
-  }
-
-  const viewerCity = cityRef.current
-  const viewerInterests = interestsRef.current
-
   useEffect(() => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const handler = (e: any) => {
@@ -70,6 +56,9 @@ export function Feed() {
     setDeferredPrompt(null)
   }
 
+  const viewerCity = profile?.current_city ?? ''
+  const viewerInterests = profile?.interests ?? []
+
   const { profiles, loading: profilesLoading, error } = useProfiles(viewerCity, viewerInterests)
   const { plans, loading: plansLoading } = usePlans(viewerCity)
 
@@ -85,16 +74,12 @@ export function Feed() {
   }
 
   const visibleProfiles = profiles.filter(p => !dismissed.includes(p.id))
-
   const filteredProfiles = visibleProfiles.filter(p => {
     if (activeFilter === 'Traveler') return !p.is_local
     if (activeFilter === 'Local') return p.is_local
     return true
   })
-
-  const hapPersonCount = profiles.filter(
-    p => computeAffinity(p.interests, viewerInterests) >= 30
-  ).length
+  const hapPersonCount = profiles.filter(p => computeAffinity(p.interests, viewerInterests) >= 30).length
 
   return (
     <div className="min-h-screen bg-cream flex flex-col">
@@ -103,7 +88,6 @@ export function Feed() {
           <p className="text-red-600 text-xs font-bold">Error: {error}</p>
         </div>
       )}
-
       {showInstallBanner && (
         <div className="mx-4 mt-4 bg-ink rounded-2xl px-4 py-3 flex items-center justify-between">
           <div>
@@ -116,7 +100,6 @@ export function Feed() {
           </div>
         </div>
       )}
-
       <div className="px-4 pt-10 pb-0">
         <div className="flex items-start justify-between mb-1">
           <div>
@@ -129,7 +112,6 @@ export function Feed() {
           </button>
         </div>
       </div>
-
       <div className="px-4 mt-3">
         <div className="flex bg-sand rounded-xl p-1 gap-1">
           {(['people', 'plans'] as const).map(tab => (
@@ -140,23 +122,16 @@ export function Feed() {
           ))}
         </div>
       </div>
-
       {activeTab === 'people' && (
         <div className="flex gap-2 px-4 mt-3 overflow-x-auto pb-0.5">
-          {FILTERS.map(f => (
-            <Chip key={f} label={f} active={activeFilter === f} onClick={() => setActiveFilter(f)} />
-          ))}
+          {FILTERS.map(f => <Chip key={f} label={f} active={activeFilter === f} onClick={() => setActiveFilter(f)} />)}
         </div>
       )}
-
       {activeTab === 'people' && hapPersonCount > 0 && (
         <div className="mx-4 mt-3 bg-white border border-[#E8E4DC] rounded-xl px-3 py-2 text-center">
-          <p className="text-[10px] text-muted">
-            <span className="text-ink font-bold">{hapPersonCount} people</span>{' '}with similar interests in {viewerCity}
-          </p>
+          <p className="text-[10px] text-muted"><span className="text-ink font-bold">{hapPersonCount} people</span>{' '}with similar interests in {viewerCity}</p>
         </div>
       )}
-
       <div className="flex-1 px-3 mt-3 pb-24 overflow-y-auto">
         {activeTab === 'people' && (
           <>
@@ -172,9 +147,8 @@ export function Feed() {
               </div>
             ) : (
               <div className="flex flex-col gap-3">
-                {filteredProfiles.map(p => (
-                  <ProfileCard key={p.id} profile={p} viewerInterests={viewerInterests}
-                    activePlan={null}
+                {filterProfiles.map(p => (
+                  <ProfileCard key={p.id} profile={p} viewerInterests={viewerInterests} activePlan={null}
                     onPass={() => setDismissed(d => [...d, p.id])}
                     onConnect={() => navigate(`/profile/${p.id}`)}
                     onJoinPlan={() => navigate(`/profile/${p.id}`)} />
@@ -183,11 +157,10 @@ export function Feed() {
             )}
           </>
         )}
-
         {activeTab === 'plans' && (
           <>
             {plansLoading ? (
-              <div className="flex items-center justify-centepy-12">
+              <div className="flex items-center justify-center py-12">
                 <div className="w-6 h-6 border-2 border-sky border-t-transparent rounded-full animate-spin" />
               </div>
             ) : plans.length === 0 ? (
@@ -195,18 +168,14 @@ export function Feed() {
                 <p className="text-2xl mb-2">📍</p>
                 <p className="text-ink font-bold text-sm">No active plans yet</p>
                 <p className="text-muted text-xs mt-1">Create the first one</p>
-                <button onClick={() => navigate('/create-plan')}
-                  className="mt-4 bg-ink text-white text-xs font-bold px-5 py-2 rounded-xl active:opacity-80 transition cursor-pointer">
-                  + New plan
-                </button>
+                <buttonnClick={() => navigate('/create-plan')} className="mt-4 bg-ink text-white text-xs font-bold px-5 py-2 rounded-xl active:opacity-80 transition cursor-pointer">+ New plan</button>
               </div>
             ) : (
               <div className="flex flex-col gap-3">
                 {plans.map(plan => (
                   <button key={plan.id} onClick={() => navigate(`/plan/${plan.id}`)}
-                    className="bg-white border border-[#E8E4DC] rounded-[20px] overflow-hidden text-left cuor-pointer active:opacity-90 transition w-full">
-                    <div className="h-[100px] relative flex items-center justify-center"
-                      style={{ background: getActivityGradient(plan.activity_type) }}>
+                    className="bg-white border border-[#E8E4DC] rounded-[20px] overflow-hidden text-left cursor-pointer active:opacity-90 transition w-full">
+                    <div className="h-[100px] relative flex items-center justify-center" style={{ background: getActivityGradient(plan.activity_type) }}>
                       <span className="text-4xl relative z-10 mb-8">{getActivityEmoji(plan.activity_type)}</span>
                       <div className="absolute inset-0 z-20" style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.65) 0%, rgba(0,0,0,0.1) 50%, transparent 100%)' }} />
                       <div className="absolute bottom-0 left-0 right-0 px-3 pb-2.5 z-30">
@@ -215,13 +184,13 @@ export function Feed() {
                       </div>
                     </div>
                     <div className="px-3 py-3">
-                      <div className="flex itms-center justify-between mb-2">
+                      <div className="flex items-center justify-between mb-2">
                         <p className="text-[10px] font-bold text-muted uppercase tracking-wider">{formatPlanTime(plan.scheduled_at)}</p>
                         {plan.is_hap_day && <span className="text-[9px] font-bold text-sky bg-[#EBF4FF] px-2 py-0.5 rounded-full">✦ HAP DAY</span>}
                       </div>
                       {plan.location_name && <p className="text-xs text-muted mb-2.5">📍 {plan.location_name}</p>}
                       <div className="flex items-center justify-between">
-                        <p className="text-[10px] text-muted">Max {plan.max_participants} people</p>
+                   <p className="text-[10px] text-muted">Max {plan.max_participants} people</p>
                         <span className="bg-sky text-white text-xs font-bold px-4 py-2 rounded-xl">View plan →</span>
                       </div>
                     </div>
@@ -232,12 +201,9 @@ export function Feed() {
           </>
         )}
       </div>
-
-      <button onClick={() => navigate('/create-plan')}
-        className="fixed bo0 right-4 w-12 h-12 bg-ink rounded-2xl shadow-lg flex items-center justify-center cursor-pointer active:scale-95 transition z-40">
+      <button onClick={() => navigate('/create-plan')} className="fixed bottom-20 right-4 w-12 h-12 bg-ink rounded-2xl shadow-lg flex items-center justify-center cursor-pointer active:scale-95 transition z-40">
         <Plus size={20} className="text-white" strokeWidth={2.5} />
       </button>
-
       <BottomNav active="explore" />
     </div>
   )
