@@ -11,7 +11,7 @@ function computeAffinity(profileInterests: string[], viewerInterests: string[]):
 
 export function useProfiles(currentCity: string, viewerInterests: string[], excludeUserId?: string) {
   const [profiles, setProfiles] = useState<Profile[]>([])
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
