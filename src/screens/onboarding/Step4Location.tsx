@@ -55,7 +55,7 @@ export function Step4Location() {
     console.log('City:', selectedCity, 'isLocal:', mode === 'local')
 
     try {
-      const { error } = await supabase
+      const upsertPromise = supabase
         .from('profiles')
         .upsert({
           user_id: user.id,
@@ -74,7 +74,13 @@ export function Step4Location() {
           membership_status: 'trial',
         }, { onConflict: 'user_id' })
 
-      console.log('Insert result - error:', error)
+      const timeoutPromise = new Promise<{ data: null; error: Error }>(resolve =>
+        setTimeout(() => resolve({ data: null, error: new Error('Saving timed out. Check your connection and try again.') }), 15000)
+      )
+
+      const { error } = await Promise.race([upsertPromise, timeoutPromise])
+
+      console.log('Upsert result - error:', error)
 
       if (error) {
         setErrorMsg(error.message)
@@ -82,18 +88,19 @@ export function Step4Location() {
         return
       }
 
+      // Fire admissions insert without blocking navigation
       if (stored.bio_question) {
-        await supabase.from('admissions').insert({
+        supabase.from('admissions').insert({
           user_id: user.id,
           answer_1: stored.bio_question,
           status: 'pending',
+        }).then(({ error: admErr }) => {
+          if (admErr) console.error('Admissions insert error:', admErr)
         })
       }
 
       onboardingStore.clear()
       navigate('/feed', { replace: true })
-
-      // Refresh profile in background after navigation
       refreshProfile()
 
     } catch (err) {
