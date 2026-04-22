@@ -21,10 +21,7 @@ export function LoadingScreen() {
         <div className="flex flex-col items-center gap-2 mt-4">
           <p className="text-muted text-xs">Taking longer than usual...</p>
           <button
-            onClick={() => {
-              localStorage.removeItem('hap-profile-v1')
-              navigate('/', { replace: true })
-            }}
+            onClick={() => navigate('/', { replace: true })}
             className="bg-ink text-white text-xs font-bold px-5 py-2.5 rounded-xl"
           >
             Back to sign in
