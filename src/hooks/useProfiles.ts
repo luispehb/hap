@@ -27,19 +27,32 @@ export function useProfiles(currentCity: string, viewerInterests: string[]) {
 
       if (error) {
         setError(error.message)
-      } else {
-        const sorted = (data || []).sort((a, b) => {
-          const affinityA = computeAffinity(a.interests, viewerInterests)
-          const affinityB = computeAffinity(b.interests, viewerInterests)
-          return affinityB - affinityA
-        })
-        setProfiles(sorted)
+        setLoading(false)
+        return
       }
+
+      const sorted = (data || []).sort((a, b) => {
+        const affinityA = computeAffinity(a.interests, viewerInterests)
+        const affinityB = computeAffinity(b.interests, viewerInterests)
+        return affinityB - affinityA
+      })
+      setProfiles(sorted)
       setLoading(false)
     }
 
     fetchProfiles()
-  }, [currentCity, viewerInterests.join(",")])
+  }, [currentCity])
+
+  // Re-sort when interests change without re-fetching
+  useEffect(() => {
+    if (profiles.length === 0) return
+    const sorted = [...profiles].sort((a, b) => {
+      const affinityA = computeAffinity(a.interests, viewerInterests)
+      const affinityB = computeAffinity(b.interests, viewerInterests)
+      return affinityB - affinityA
+    })
+    setProfiles(sorted)
+  }, [viewerInterests.join(',')])
 
   return { profiles, loading, error }
 }
