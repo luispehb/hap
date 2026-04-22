@@ -164,6 +164,20 @@ export function Profile() {
       {isOwnProfile ? (
         /* Own profile: banner + avatar bubble */
         <div className="relative flex-shrink-0">
+          <div className="flex items-center justify-between px-4 pt-12 pb-2 absolute top-0 left-0 right-0 z-20">
+            <button
+              onClick={() => navigate('/profile/edit')}
+              className="bg-white/80 backdrop-blur-sm border border-[#E8E4DC] rounded-xl px-3 py-1.5 text-xs font-bold text-ink active:bg-sand transition cursor-pointer"
+            >
+              Edit profile
+            </button>
+            <button
+              onClick={() => signOut()}
+              className="bg-white/80 backdrop-blur-sm border border-[#E8E4DC] rounded-xl px-3 py-1.5 text-xs font-bold text-muted active:bg-sand transition cursor-pointer"
+            >
+              Sign out
+            </button>
+          </div>
           <div className="h-[130px] overflow-hidden">
             <img
               src={getBannerPhoto(profile.display_name, profile.origin_city)}
@@ -392,23 +406,33 @@ export function Profile() {
           </div>
         </div>
 
-        {/* Social links — own profile always visible; other profile only when connected */}
-        {(isOwnProfile ? activeSocialPlatforms.length > 0 : false) && (
+        {/* Social links — own profile always visible */}
+        {isOwnProfile && (
           <div>
             <p className="text-[10px] font-bold text-muted uppercase tracking-widest mb-2">
               Connect outside Hap
             </p>
-            <div className="flex flex-wrap gap-2">
-              {activeSocialPlatforms.map(([platform]) => (
-                <div
-                  key={platform}
-                  className="bg-white border border-[#E8E4DC] rounded-xl px-3 py-2 flex items-center gap-1.5"
-                >
-                  <span>{SOCIAL_EMOJIS[platform] ?? '🔗'}</span>
-                  <span className="text-xs font-bold text-ink capitalize">{platform}</span>
-                </div>
-              ))}
-            </div>
+            {activeSocialPlatforms.length > 0 ? (
+              <div className="flex flex-wrap gap-2">
+                {activeSocialPlatforms.map(([platform, handle]) => (
+                  <button
+                    key={platform}
+                    onClick={() => handle && window.open(getSocialUrl(platform, handle), '_blank')}
+                    className="bg-white border border-[#E8E4DC] rounded-xl px-3 py-2 flex items-center gap-1.5 active:bg-sand transition cursor-pointer"
+                  >
+                    <span>{SOCIAL_EMOJIS[platform] ?? '🔗'}</span>
+                    <span className="text-xs font-bold text-ink capitalize">{platform}</span>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <button
+                onClick={() => navigate('/profile/edit')}
+                className="w-full bg-white border border-dashed border-[#E8E4DC] rounded-xl px-4 py-3 text-muted text-xs text-center active:bg-sand transition cursor-pointer"
+              >
+                + Add your social links
+              </button>
+            )}
           </div>
         )}
 
@@ -477,21 +501,7 @@ export function Profile() {
 
       {isOwnProfile
         ? (
-          <>
-            <button
-              onClick={() => navigate('/profile/edit')}
-              className="fixed top-12 left-4 z-10 bg-white/80 border border-[#E8E4DC] rounded-xl px-3 py-1.5 text-xs font-bold text-muted active:bg-sand transition cursor-pointer"
-            >
-              Edit profile
-            </button>
-            <button
-              onClick={() => signOut()}
-              className="fixed top-12 right-4 z-10 bg-white/80 border border-[#E8E4DC] rounded-xl px-3 py-1.5 text-xs font-bold text-muted active:bg-sand transition cursor-pointer"
-            >
-              Sign out
-            </button>
-            <BottomNav active="profile" />
-          </>
+          <BottomNav active="profile" />
         )
         : (
           <>
