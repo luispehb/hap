@@ -33,7 +33,14 @@ export function usePlans(city: string) {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    if (!city) {
+      setPlans([])
+      setLoading(false)
+      return
+    }
+
     async function fetchPlans() {
+      setLoading(true)
       const now = new Date().toISOString()
       const { data } = await supabase
         .from('plans')
@@ -46,6 +53,7 @@ export function usePlans(city: string) {
       setPlans(data || [])
       setLoading(false)
     }
+
     fetchPlans()
   }, [city])
 

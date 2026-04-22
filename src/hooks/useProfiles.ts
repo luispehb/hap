@@ -15,36 +15,49 @@ export function useProfiles(currentCity: string, viewerInterests: string[], excl
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    if (!currentCity) return
+    if (!currentCity) {
+      setProfiles([])
+      setError(null)
+      setLoading(false)
+      return
+    }
+
     let cancelled = false
     setLoading(true)
     setError(null)
 
-    console.log('[useProfiles] querying city:', JSON.stringify(currentCity), 'excludeUserId:', excludeUserId)
+    async function fetchProfiles() {
+      let query = supabase
+        .from('profiles')
+        .select('*')
+        .eq('current_city', currentCity)
+        .order('trust_score', { ascending: false })
 
-    let query = supabase
-      .from('profiles')
-      .select('*')
-      .eq('current_city', currentCity)
-      .order('trust_score', { ascending: false })
+      if (excludeUserId) {
+        query = query.neq('user_id', excludeUserId)
+      }
 
-    if (excludeUserId) {
-      query = query.neq('user_id', excludeUserId)
-    }
+      const { data, error: err } = await query
 
-    query.then(({ data, error: err }) => {
       if (cancelled) return
-      console.log('[useProfiles] result:', data?.length ?? 0, 'profiles, error:', err?.message)
-      if (err) { setError(err.message); setLoading(false); return }
-      const sorted = (data as Profile[] || []).sort((a, b) =>
+      if (err) {
+        setError(err.message)
+        setLoading(false)
+        return
+      }
+
+      const sorted = ((data as Profile[]) || []).sort((a, b) =>
         computeAffinity(b.interests, viewerInterests) - computeAffinity(a.interests, viewerInterests)
       )
+
       setProfiles(sorted)
       setLoading(false)
-    })
+    }
+
+    fetchProfiles()
 
     return () => { cancelled = true }
-  }, [currentCity, excludeUserId])
+  }, [currentCity, excludeUserId, viewerInterests])
 
   return { profiles, loading, error }
 }
