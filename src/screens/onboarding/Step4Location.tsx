@@ -57,7 +57,7 @@ export function Step4Location() {
     try {
       const { error } = await supabase
         .from('profiles')
-        .insert({
+        .upsert({
           user_id: user.id,
           display_name: stored.display_name ||
             user.user_metadata?.full_name?.split(' ')[0] ||
@@ -72,7 +72,7 @@ export function Step4Location() {
           trust_score: 50,
           is_verified: false,
           membership_status: 'trial',
-        })
+        }, { onConflict: 'user_id' })
 
       console.log('Insert result - error:', error)
 
