@@ -15,15 +15,14 @@ export function useProfiles(currentCity: string, viewerInterests: string[]) {
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
+    if (!currentCity) return
+
     async function fetchProfiles() {
-      console.log('Fetching profiles for city:', currentCity)
-      console.log('Supabase URL:', import.meta.env.VITE_SUPABASE_URL)
       setLoading(true)
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
         .eq('current_city', currentCity)
-        
         .order('trust_score', { ascending: false })
 
       if (error) {
@@ -38,6 +37,7 @@ export function useProfiles(currentCity: string, viewerInterests: string[]) {
       }
       setLoading(false)
     }
+
     fetchProfiles()
   }, [currentCity])
 
