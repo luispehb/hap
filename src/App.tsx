@@ -1,5 +1,4 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
-import { AppErrorBoundary } from './components/AppErrorBoundary'
 import { AuthProvider } from './contexts/AuthContext'
 import { ProtectedRoute } from './components/ProtectedRoute'
 import { Splash } from './screens/Splash'
@@ -21,7 +20,6 @@ import { Invite } from './screens/Invite'
 
 function App() {
   return (
-    <AppErrorBoundary>
       <AuthProvider>
         <BrowserRouter>
           <div className="min-h-screen bg-sand flex justify-center">
@@ -60,7 +58,6 @@ function App() {
           </div>
         </BrowserRouter>
       </AuthProvider>
-    </AppErrorBoundary>
   )
 }
 
