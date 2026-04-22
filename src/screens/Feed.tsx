@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate, useLocation, Navigate } from 'react-router-dom'
 import { useProfiles } from '../hooks/useProfiles'
 import { usePlans, getActivityEmoji } from '../hooks/usePlans'
@@ -37,19 +37,8 @@ export function Feed() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null)
 
-  // Estabilizar city e interests para evitar re-fetches innecesarios
-  const cityRef = useRef('')
-  const interestsRef = useRef<string[]>([])
-
-  if (profile?.current_city && profile.current_city !== cityRef.current) {
-    cityRef.current = profile.current_city
-  }
-  if (profile?.interests?.length && interestsRef.current.length === 0) {
-    interestsRef.current = profile.interests
-  }
-
-  const viewerCity = cityRef.current
-  const viewerInterests = interestsRef.current
+  const viewerCity = profile?.current_city ?? ''
+  const viewerInterests = profile?.interests ?? []
 
   useEffect(() => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -70,7 +59,7 @@ export function Feed() {
     setDeferredPrompt(null)
   }
 
-  const { profiles, loading: profilesLoading, error } = useProfiles(viewerCity, viewerInterests)
+  const { profiles, loading: profilesLoading, error } = useProfiles(viewerCity, viewerInterests, user?.id)
   const { plans, loading: plansLoading } = usePlans(viewerCity)
 
   if (!user) return <Navigate to="/" replace />

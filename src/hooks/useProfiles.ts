@@ -9,51 +9,42 @@ function computeAffinity(profileInterests: string[], viewerInterests: string[]):
   return Math.round((matches / viewerInterests.length) * 100)
 }
 
-export function useProfiles(currentCity: string, viewerInterests: string[]) {
+export function useProfiles(currentCity: string, viewerInterests: string[], excludeUserId?: string) {
   const [profiles, setProfiles] = useState<Profile[]>([])
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    if (!currentCity) { setLoading(false); return }
+    if (!currentCity) return
+    let cancelled = false
+    setLoading(true)
+    setError(null)
 
-    async function fetchProfiles() {
-      setError(null)
-      setLoading(true)
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('current_city', currentCity)
-        .order('trust_score', { ascending: false })
+    console.log('[useProfiles] querying city:', JSON.stringify(currentCity), 'excludeUserId:', excludeUserId)
 
-      if (error) {
-        setError(error.message)
-        setLoading(false)
-        return
-      }
+    let query = supabase
+      .from('profiles')
+      .select('*')
+      .eq('current_city', currentCity)
+      .order('trust_score', { ascending: false })
 
-      const sorted = (data || []).sort((a, b) => {
-        const affinityA = computeAffinity(a.interests, viewerInterests)
-        const affinityB = computeAffinity(b.interests, viewerInterests)
-        return affinityB - affinityA
-      })
-      setProfiles(sorted)
-      setLoading(false)
+    if (excludeUserId) {
+      query = query.neq('user_id', excludeUserId)
     }
 
-    fetchProfiles()
-  }, [currentCity])
-
-  // Re-sort when interests change without re-fetching
-  useEffect(() => {
-    if (profiles.length === 0) return
-    const sorted = [...profiles].sort((a, b) => {
-      const affinityA = computeAffinity(a.interests, viewerInterests)
-      const affinityB = computeAffinity(b.interests, viewerInterests)
-      return affinityB - affinityA
+    query.then(({ data, error: err }) => {
+      if (cancelled) return
+      console.log('[useProfiles] result:', data?.length ?? 0, 'profiles, error:', err?.message)
+      if (err) { setError(err.message); setLoading(false); return }
+      const sorted = (data as Profile[] || []).sort((a, b) =>
+        computeAffinity(b.interests, viewerInterests) - computeAffinity(a.interests, viewerInterests)
+      )
+      setProfiles(sorted)
+      setLoading(false)
     })
-    setProfiles(sorted)
-  }, [viewerInterests.join(',')])
+
+    return () => { cancelled = true }
+  }, [currentCity, excludeUserId])
 
   return { profiles, loading, error }
 }
