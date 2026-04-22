@@ -138,7 +138,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const { data: { session } } = await supabase.auth.getSession()
         if (!mountedRef.current) return
         setSession(session)
-        setUser(ssion?.user ?? null)
+        setUser(session?.user ?? null)
         if (session?.user) {
           await fetchProfile(session.user.id)
         } else {
