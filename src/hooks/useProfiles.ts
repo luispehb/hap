@@ -23,7 +23,7 @@ export function useProfiles(currentCity: string, viewerInterests: string[]) {
         .from('profiles')
         .select('*')
         .eq('current_city', currentCity)
-        .eq('membership_status', 'active')
+        
         .order('trust_score', { ascending: false })
 
       if (error) {
