@@ -4,7 +4,7 @@ export type { Profile } from '../contexts/AuthContext'
 import type { Profile } from '../contexts/AuthContext'
 
 function computeAffinity(profileInterests: string[], viewerInterests: string[]): number {
-  if (!Array.isArray(profileInterests) || !viewerInterests.length) return 0
+  if (!viewerInterests.length) return 0
   const matches = profileInterests.filter(i => viewerInterests.includes(i)).length
   return Math.round((matches / viewerInterests.length) * 100)
 }
@@ -15,54 +15,36 @@ export function useProfiles(currentCity: string, viewerInterests: string[], excl
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    if (!currentCity) {
-      setProfiles([])
-      setError(null)
-      setLoading(false)
-      return
-    }
-
+    if (!currentCity) return
     let cancelled = false
     setLoading(true)
     setError(null)
 
-    async function fetchProfiles() {
-      try {
-        let query = supabase
-          .from('profiles')
-          .select('*')
-          .eq('current_city', currentCity)
-          .order('trust_score', { ascending: false })
+    console.log('[useProfiles] querying city:', JSON.stringify(currentCity), 'excludeUserId:', excludeUserId)
 
-        if (excludeUserId) {
-          query = query.neq('user_id', excludeUserId)
-        }
+    let query = supabase
+      .from('profiles')
+      .select('*')
+      .eq('current_city', currentCity)
+      .order('trust_score', { ascending: false })
 
-        const { data, error: err } = await query
-
-        if (cancelled) return
-        if (err) {
-          setError(err.message)
-          return
-        }
-
-        const sorted = ((data as Profile[]) || []).sort((a, b) =>
-          computeAffinity(b.interests, viewerInterests) - computeAffinity(a.interests, viewerInterests)
-        )
-
-        setProfiles(sorted)
-      } catch (err) {
-        if (cancelled) return
-        setError(err instanceof Error ? err.message : 'Failed to load profiles')
-      } finally {
-        if (!cancelled) setLoading(false)
-      }
+    if (excludeUserId) {
+      query = query.neq('user_id', excludeUserId)
     }
 
-    fetchProfiles()
+    query.then(({ data, error: err }) => {
+      if (cancelled) return
+      console.log('[useProfiles] result:', data?.length ?? 0, 'profiles, error:', err?.message)
+      if (err) { setError(err.message); setLoading(false); return }
+      const sorted = (data as Profile[] || []).sort((a, b) =>
+        computeAffinity(b.interests, viewerInterests) - computeAffinity(a.interests, viewerInterests)
+      )
+      setProfiles(sorted)
+      setLoading(false)
+    })
 
     return () => { cancelled = true }
-  }, [currentCity, excludeUserId, viewerInterests])
+  }, [currentCity, excludeUserId])
 
   return { profiles, loading, error }
 }
