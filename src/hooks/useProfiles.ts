@@ -15,7 +15,7 @@ export function useProfiles(currentCity: string, viewerInterests: string[]) {
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    if (!currentCity) return
+    if (!currentCity) { setLoading(false); return }
 
     async function fetchProfiles() {
       setError(null)
