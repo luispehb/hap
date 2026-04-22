@@ -39,7 +39,7 @@ export function useProfiles(currentCity: string, viewerInterests: string[]) {
     }
 
     fetchProfiles()
-  }, [currentCity])
+  }, [currentCity, viewerInterests.join(",")])
 
   return { profiles, loading, error }
 }
