@@ -10,6 +10,7 @@ import { Feed } from './screens/Feed'
 import { CreatePlan } from './screens/CreatePlan'
 import { PlanDetail } from './screens/PlanDetail'
 import { Profile } from './screens/Profile'
+import { EditProfile } from './screens/EditProfile'
 import { Chat } from './screens/Chat'
 import { Rating } from './screens/Rating'
 import { Journal } from './screens/Journal'
@@ -31,6 +32,7 @@ function App() {
               <Route path="/create-plan" element={<ProtectedRoute><CreatePlan /></ProtectedRoute>} />
               <Route path="/plan/:planId" element={<ProtectedRoute><PlanDetail /></ProtectedRoute>} />
               <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+              <Route path="/profile/edit" element={<ProtectedRoute><EditProfile /></ProtectedRoute>} />
               <Route path="/profile/:id" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
               <Route path="/chat/:planId" element={<ProtectedRoute><Chat /></ProtectedRoute>} />
               <Route path="/rate/:planId" element={<ProtectedRoute><Rating /></ProtectedRoute>} />

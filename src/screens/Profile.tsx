@@ -479,6 +479,12 @@ export function Profile() {
         ? (
           <>
             <button
+              onClick={() => navigate('/profile/edit')}
+              className="fixed top-12 left-4 z-10 bg-white/80 border border-[#E8E4DC] rounded-xl px-3 py-1.5 text-xs font-bold text-muted active:bg-sand transition cursor-pointer"
+            >
+              Edit profile
+            </button>
+            <button
               onClick={() => signOut()}
               className="fixed top-12 right-4 z-10 bg-white/80 border border-[#E8E4DC] rounded-xl px-3 py-1.5 text-xs font-bold text-muted active:bg-sand transition cursor-pointer"
             >
