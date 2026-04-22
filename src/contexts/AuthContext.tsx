@@ -58,84 +58,87 @@ const saveCache = (p: Profile | null) => {
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const cached = getCache()
   const [user, setUser] = useState<User | null>(null)
-  const [profile, setProfile] = useState<Profile | null>(getCache())
+  const [profile, setProfile] = useState<Profile | null>(cached)
   const [session, setSession] = useState<Session | null>(null)
-  const [loading, setLoading] = useState(!getCache())
+  const [loading, setLoading] = useState(!cached)
 
   const fetchingForRef = useRef<string | null>(null)
+  const retryCountRef = useRef<number>(0)
+  const mountedRef = useRef(true)
 
   const updateProfile = useCallback((p: Profile | null) => {
     setProfile(p)
     saveCache(p)
   }, [])
 
-  // Retry loop: 4 attempts at 0 / 2 / 4 / 6 s — all awaited so the
-  // failsafe in initialize() covers the entire fetch period.
-  const fetchProfile = useCallback(async (userId: string) => {
-    if (fetchingForRef.current === userId) {
-      console.log('fetchProfile already in progress for:', userId)
-      return
-    }
+  const fetchProfile = useCallback(async (userId: string, isRetry = false) => {
+    if (!isRetry && fetchingForRef.current === userId) return
     fetchingForRef.current = userId
-    const DELAYS = [0, 2000, 4000, 6000]
     try {
-      for (let attempt = 0; attempt < DELAYS.length; attempt++) {
-        if (DELAYS[attempt] > 0) {
-          console.log(`fetchProfile retry ${attempt}/${DELAYS.length - 1} in ${DELAYS[attempt]}ms`)
-          await new Promise(r => setTimeout(r, DELAYS[attempt]))
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('user_id', userId)
+        .maybeSingle()
+
+      if (!mountedRef.current) return
+
+      if (data) {
+        retryCountRef.current = 0
+        updateProfile(data as Profile)
+        fetchingForRef.current = null
+        setLoading(false)
+      } else if (error) {
+        console.error('fetchProfile DB error:', error)
+        fetchingForRef.current = null
+        setLoading(false)
+      } else {
+        fetchingForRef.current = null
+        if (retryCountRef.current < 4) {
+          retryCountRef.current++
+          const delay = retryCountRef.current * 3000
+          console.log(`Profile not found, retry ${retryCountRef.current}/4 in ${delay}ms`)
+          setTimeout(() => {
+            if (mountedRef.current) fetchProfile(userId, true)
+          }, delay)
+        } else {
+          retryCountRef.current = 0
+          setLoading(false)
         }
-        console.log('fetchProfile called for:', userId, attempt > 0 ? `(attempt ${attempt + 1})` : '')
-        const { data, error } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('user_id', userId)
-          .maybeSingle()
-        console.log('fetchProfile result:', { hasData: !!data, error })
-        if (data) {
-          updateProfile(data as Profile)
-          return
-        }
-        if (error) {
-          // Real DB error — don't keep retrying, just unblock
-          console.error('fetchProfile DB error:', error)
-          return
-        }
-        // data=null, no error — cold start returned empty, retry
       }
-      console.log('Profile not found after all attempts')
     } catch (err) {
       console.error('fetchProfile error:', err)
-    } finally {
-      fetchingForRef.current = null
-      setLoading(false)
+      if (mountedRef.current) {
+        fetchingForRef.current = null
+        setLoading(false)
+      }
     }
   }, [updateProfile])
 
   const refreshProfile = useCallback(async () => {
-    if (user?.id) {
-      await fetchProfile(user.id)
-    }
+    if (user?.id) await fetchProfile(user.id)
   }, [user, fetchProfile])
 
   useEffect(() => {
-    let mounted = true
+    mountedRef.current = true
 
-    // Absolute last resort: if Supabase never responds in 45s, unblock the UI.
     const failsafe = setTimeout(() => {
-      if (mounted) {
-        console.warn('Auth init: 45s failsafe triggered')
+      if (mountedRef.current) {
+        console.warn('Auth init: 60s failsafe triggered')
         fetchingForRef.current = null
-        setLoading(false)
+        // Solo desbloquear si no hay cache — si hay cache el usuario ya ve la app
+        if (!getCache()) setLoading(false)
       }
-    }, 45000)
+    }, 60000)
 
     async function initialize() {
       try {
         const { data: { session } } = await supabase.auth.getSession()
-        if (!mounted) return
+        if (!mountedRef.current) return
         setSession(session)
-        setUser(session?.user ?? null)
+        setUser(ssion?.user ?? null)
         if (session?.user) {
           await fetchProfile(session.user.id)
         } else {
@@ -143,7 +146,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       } catch (err) {
         console.error('Auth init error:', err)
-        if (mounted) setLoading(false)
+        if (mountedRef.current) setLoading(false)
       } finally {
         clearTimeout(failsafe)
       }
@@ -155,37 +158,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        if (!mounted) return
-        console.log('Auth state change:', event, !!session)
+        if (!mountedRef.current) return
 
         if (event === 'SIGNED_IN') {
-          if (lastEventRef.current === 'SIGNED_IN') {
-            console.log('Ignoring duplicate SIGNED_IN')
-            return
-          }
+          if (lastEventRef.current === 'SIGNED_IN') return
           lastEventRef.current = 'SIGNED_IN'
           if (session?.user) {
-            setLoading(true)
             setSession(session)
             setUser(session.user)
             await new Promise(r => setTimeout(r, 500))
-            if (mounted) await fetchProfile(session.user.id)
+            if (mountedRef.current) await fetchProfile(session.user.id)
           }
         } else if (event === 'SIGNED_OUT') {
           lastEventRef.current = 'SIGNED_OUT'
           setSession(null)
           setUser(null)
           updateProfile(null)
+          retryCountRef.current = 0
           setLoading(false)
-        } else if (event === 'INITIAL_SESSION') {
-          lastEventRef.current = 'INITIAL_SESSION'
-          // Already handled by initialize()
         }
       }
     )
 
     return () => {
-      mounted = false
+      mountedRef.current = false
       subscription.unsubscribe()
     }
   }, [fetchProfile, updateProfile])
