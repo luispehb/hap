@@ -47,6 +47,18 @@ const AuthContext = createContext<AuthContextType>({
 })
 
 const CACHE_KEY = 'hap-profile-v1'
+const SESSION_TIMEOUT_MS = 7000
+const PROFILE_TIMEOUT_MS = 8000
+
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number, message: string): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timeout = window.setTimeout(() => reject(new Error(message)), timeoutMs)
+    promise
+      .then(resolve)
+      .catch(reject)
+      .finally(() => window.clearTimeout(timeout))
+  })
+}
 
 const getCache = (): Profile | null => {
   try {
@@ -88,11 +100,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!isRetry && fetchingForRef.current === userId) return
     fetchingForRef.current = userId
     setError(null)
+    const controller = new AbortController()
+    const timeout = window.setTimeout(() => controller.abort(), PROFILE_TIMEOUT_MS)
     try {
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
         .eq('user_id', userId)
+        .abortSignal(controller.signal)
         .maybeSingle()
 
       if (!mountedRef.current) return
@@ -129,6 +144,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setError(err instanceof Error ? err.message : 'Failed to load your profile')
         setLoading(false)
       }
+    } finally {
+      window.clearTimeout(timeout)
     }
   }, [updateProfile])
 
@@ -140,7 +157,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setLoading(true)
     setError(null)
     try {
-      const { data: { session } } = await supabase.auth.getSession()
+      const { data: { session } } = await withTimeout(
+        supabase.auth.getSession(),
+        SESSION_TIMEOUT_MS,
+        'Restoring your session timed out.'
+      )
       if (!mountedRef.current) return
 
       setSession(session)
@@ -181,19 +202,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     initialize().finally(() => clearTimeout(failsafe))
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
+      (event, session) => {
         if (!mountedRef.current) return
 
-        if (event === 'SIGNED_IN') {
-          if (lastEventRef.current === 'SIGNED_IN') return
-          lastEventRef.current = 'SIGNED_IN'
+        if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION') {
+          const eventKey = `${event}:${session?.user?.id ?? 'none'}`
+          if (lastEventRef.current === eventKey) return
+          lastEventRef.current = eventKey
           if (session?.user) {
             setLoading(true)
             setError(null)
             setSession(session)
             setUser(session.user)
-            await new Promise(r => setTimeout(r, 500))
-            if (mountedRef.current) await fetchProfile(session.user.id)
+            window.setTimeout(() => {
+              if (mountedRef.current) void fetchProfile(session.user.id)
+            }, 0)
+          } else if (event === 'INITIAL_SESSION') {
+            setSession(null)
+            setUser(null)
+            setLoading(false)
           }
         } else if (event === 'SIGNED_OUT') {
           lastEventRef.current = 'SIGNED_OUT'
@@ -203,8 +230,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           retryCountRef.current = 0
           setError(null)
           setLoading(false)
-        } else if (event === 'INITIAL_SESSION') {
-          lastEventRef.current = 'INITIAL_SESSION'
         }
       }
     )
