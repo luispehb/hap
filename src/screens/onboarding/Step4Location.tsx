@@ -86,25 +86,45 @@ export function Step4Location() {
       const pendingInviteCode = sessionStorage.getItem('hapInviteCode')
       if (pendingInviteCode && profileData?.id) {
         sessionStorage.removeItem('hapInviteCode')
-        const markInviteUsed = async () => {
-          const { error } = await supabase
+        const markInviteUsedAndConnect = async () => {
+          // 1. Get the invitation to find inviter_id
+          const { data: invite } = await supabase
+            .from('invitations')
+            .select('inviter_id')
+            .eq('code', pendingInviteCode)
+            .eq('used', false)
+            .maybeSingle()
+
+          // 2. Mark invite as used
+          await supabase
             .from('invitations')
             .update({ used: true, used_by: profileData.id })
             .eq('code', pendingInviteCode)
             .eq('used', false)
 
-          if (!error) return
+          // 3. If we found the inviter, create a mutual connection
+          if (invite?.inviter_id) {
+            // Get inviter's profile.id from their auth user_id
+            const { data: inviterProfile } = await supabase
+              .from('profiles')
+              .select('id')
+              .eq('user_id', invite.inviter_id)
+              .maybeSingle()
 
-          const fallback = await supabase
-            .from('invitations')
-            .update({ used: true, used_by: user.id })
-            .eq('code', pendingInviteCode)
-            .eq('used', false)
-
-          if (fallback.error) console.error('Failed to mark invite used:', fallback.error)
+            if (inviterProfile?.id && profileData?.id) {
+              await supabase
+                .from('connections')
+                .insert({
+                  user_a_id: inviterProfile.id,
+                  user_b_id: profileData.id,
+                  user_a_wants_connect: true,
+                  user_b_wants_connect: true,
+                })
+            }
+          }
         }
 
-        markInviteUsed()
+        markInviteUsedAndConnect()
       } else if (pendingInviteCode) {
         sessionStorage.removeItem('hapInviteCode')
         supabase
