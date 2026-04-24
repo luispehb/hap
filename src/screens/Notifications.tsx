@@ -10,7 +10,8 @@ interface ConnectionRequest {
   id: string
   user_a_id: string
   user_b_id: string
-  connected_at: string
+  connected_at?: string
+  created_at?: string
 }
 
 interface PlanInvite {
@@ -66,15 +67,18 @@ export function Notifications() {
       try {
         const { data: connData, error: connError } = await supabase
           .from('connections')
-          .select('id, user_a_id, user_b_id, connected_at')
+          .select('*')
           .eq('user_b_id', ownProfile!.id)
           .eq('user_a_wants_connect', true)
           .eq('user_b_wants_connect', false)
-          .order('connected_at', { ascending: false })
 
         if (connError) throw connError
 
-        const reqs = (connData ?? []) as ConnectionRequest[]
+        const reqs = ((connData ?? []) as ConnectionRequest[]).sort((a, b) => {
+          const aTime = new Date(a.connected_at ?? a.created_at ?? 0).getTime()
+          const bTime = new Date(b.connected_at ?? b.created_at ?? 0).getTime()
+          return bTime - aTime
+        })
         setRequests(reqs)
 
         if (reqs.length > 0) {
@@ -224,7 +228,9 @@ export function Notifications() {
                         <p className="text-muted text-xs">
                           {other.origin_city} · {other.is_local ? 'Local' : other.current_city}
                         </p>
-                        <p className="text-muted text-[10px] mt-0.5">{timeAgo(req.connected_at)}</p>
+                        <p className="text-muted text-[10px] mt-0.5">
+                          {timeAgo(req.connected_at ?? req.created_at ?? new Date().toISOString())}
+                        </p>
                       </div>
                       <div className="bg-[#F0FFD0] px-2 py-1 rounded-lg">
                         <p className="text-[#3a6010] text-[10px] font-bold">{other.trust_score}</p>

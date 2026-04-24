@@ -170,15 +170,11 @@ export function Profile() {
     let { error } = await supabase
       .from('invitations')
       .insert({ inviter_id: ownProfile.id, code })
-      .select('code')
-      .single()
 
     if (error && user?.id && user.id !== ownProfile.id) {
       const fallback = await supabase
         .from('invitations')
         .insert({ inviter_id: user.id, code })
-        .select('code')
-        .single()
       error = fallback.error
     }
 

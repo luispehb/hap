@@ -44,13 +44,41 @@ export function Journal() {
 
         const { data, error } = await supabase
           .from('plans')
-          .select('*, participants:plan_participants(profile:profiles(display_name, origin_city))')
+          .select('*')
           .order('created_at', { ascending: false })
 
         if (error) throw error
-        setPlans(((data ?? []) as JournalPlan[]).filter(plan =>
+        const visiblePlans = ((data ?? []) as JournalPlan[]).filter(plan =>
           plan.creator_id === ownProfile!.id || joinedPlanIds.has(plan.id)
-        ))
+        )
+
+        setPlans(visiblePlans)
+
+        if (visiblePlans.length > 0) {
+          const { data: participantRows, error: participantsError } = await supabase
+            .from('plan_participants')
+            .select('plan_id, profile:profiles(display_name, origin_city)')
+            .in('plan_id', visiblePlans.map(plan => plan.id))
+
+          if (!participantsError && participantRows) {
+            const participantsByPlan = new Map<string, JournalPlan['participants']>()
+            const rows = participantRows as unknown as {
+              plan_id: string
+              profile: { display_name: string; origin_city: string } | { display_name: string; origin_city: string }[] | null
+            }[]
+
+            for (const row of rows) {
+              const profile = Array.isArray(row.profile) ? row.profile[0] ?? null : row.profile
+              const participants = participantsByPlan.get(row.plan_id) ?? []
+              participants.push({ profile })
+              participantsByPlan.set(row.plan_id, participants)
+            }
+            setPlans(visiblePlans.map(plan => ({
+              ...plan,
+              participants: participantsByPlan.get(plan.id) ?? [],
+            })))
+          }
+        }
       } catch (err) {
         console.error('Journal load error:', err)
         setPlans([])
