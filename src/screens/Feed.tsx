@@ -6,8 +6,8 @@ import { ProfileCard } from '../components/ui/ProfileCard'
 import { BottomNav } from '../components/ui/BottomNav'
 import { Chip } from '../components/ui/Chip'
 import { formatPlanTime, computeAffinity } from '../lib/utils'
-import { SlidersHorizontal, Plus } from 'lucide-react'
-import { supabaseReady } from '../lib/supabase'
+import { SlidersHorizontal, Plus, Bell } from 'lucide-react'
+import { supabaseReady, supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 
 const FILTERS = ['Best match', 'Today', 'Traveler', 'Local']
@@ -36,6 +36,7 @@ export function Feed() {
   const [showInstallBanner, setShowInstallBanner] = useState(false)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null)
+  const [notifCount, setNotifCount] = useState(0)
 
   const viewerCity = profile?.current_city ?? ''
   const viewerInterests = profile?.interests ?? []
@@ -50,6 +51,18 @@ export function Feed() {
     window.addEventListener('beforeinstallprompt', handler)
     return () => window.removeEventListener('beforeinstallprompt', handler)
   }, [])
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (!profile?.id) return
+    supabase
+      .from('connections')
+      .select('id', { count: 'exact' })
+      .eq('user_b_id', profile.id)
+      .eq('user_a_wants_connect', true)
+      .eq('user_b_wants_connect', false)
+      .then(({ count }) => setNotifCount(count || 0))
+  }, [profile?.id])
 
   async function handleInstall() {
     if (!deferredPrompt) return
@@ -113,9 +126,22 @@ export function Feed() {
             <h1 className="text-[26px] font-extrabold text-ink tracking-tight leading-none">{viewerCity}</h1>
             <p className="text-muted text-xs mt-1">{profiles.length} travelers here today</p>
           </div>
-          <button className="w-9 h-9 rounded-xl bg-white border border-[#E8E4DC] flex items-center justify-center mt-1 active:bg-sand transition cursor-pointer">
-            <SlidersHorizontal size={14} className="text-muted" />
-          </button>
+          <div className="flex items-center gap-2 mt-1">
+            <button
+              onClick={() => navigate('/notifications')}
+              className="relative w-9 h-9 rounded-xl bg-white border border-[#E8E4DC] flex items-center justify-center active:bg-sand transition cursor-pointer"
+            >
+              <Bell size={14} className="text-muted" />
+              {notifCount > 0 && (
+                <span className="absolute -top-1 -right-1 w-4 h-4 bg-sky rounded-full flex items-center justify-center">
+                  <span className="text-white text-[9px] font-bold">{notifCount}</span>
+                </span>
+              )}
+            </button>
+            <button className="w-9 h-9 rounded-xl bg-white border border-[#E8E4DC] flex items-center justify-center active:bg-sand transition cursor-pointer">
+              <SlidersHorizontal size={14} className="text-muted" />
+            </button>
+          </div>
         </div>
       </div>
 

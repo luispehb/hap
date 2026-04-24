@@ -17,6 +17,7 @@ import { Journal } from './screens/Journal'
 import { Connections } from './screens/Connections'
 import { Admin } from './screens/Admin'
 import { Invite } from './screens/Invite'
+import { Notifications } from './screens/Notifications'
 
 function App() {
   return (
@@ -41,6 +42,7 @@ function App() {
                 <Route path="/journal" element={<ProtectedRoute><Journal /></ProtectedRoute>} />
                 <Route path="/connections" element={<ProtectedRoute><Connections /></ProtectedRoute>} />
                 <Route path="/admin" element={<ProtectedRoute><Admin /></ProtectedRoute>} />
+                <Route path="/notifications" element={<ProtectedRoute><Notifications /></ProtectedRoute>} />
                 <Route path="/invite/:code" element={<Invite />} />
                 <Route path="/chats" element={
                   <ProtectedRoute>
