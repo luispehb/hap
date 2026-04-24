@@ -86,9 +86,30 @@ export function Step4Location() {
       const pendingInviteCode = sessionStorage.getItem('hapInviteCode')
       if (pendingInviteCode && profileData?.id) {
         sessionStorage.removeItem('hapInviteCode')
+        const markInviteUsed = async () => {
+          const { error } = await supabase
+            .from('invitations')
+            .update({ used: true, used_by: profileData.id })
+            .eq('code', pendingInviteCode)
+            .eq('used', false)
+
+          if (!error) return
+
+          const fallback = await supabase
+            .from('invitations')
+            .update({ used: true, used_by: user.id })
+            .eq('code', pendingInviteCode)
+            .eq('used', false)
+
+          if (fallback.error) console.error('Failed to mark invite used:', fallback.error)
+        }
+
+        markInviteUsed()
+      } else if (pendingInviteCode) {
+        sessionStorage.removeItem('hapInviteCode')
         supabase
           .from('invitations')
-          .update({ used: true, used_by: profileData.id })
+          .update({ used: true, used_by: user.id })
           .eq('code', pendingInviteCode)
           .eq('used', false)
           .then(({ error }) => { if (error) console.error('Failed to mark invite used:', error) })

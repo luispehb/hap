@@ -68,7 +68,7 @@ function getSocialUrl(platform: string, handle: string): string {
 export function Profile() {
   const { id } = useParams<{ id?: string }>()
   const navigate = useNavigate()
-  const { profile: ownProfile, signOut } = useAuth()
+  const { profile: ownProfile, signOut, user } = useAuth()
   const isOwnProfile = !id
 
   const fetchedProfile = useProfile(id ?? '')
@@ -114,12 +114,17 @@ export function Profile() {
 
   useEffect(() => {
     if (!isOwnProfile || !ownProfile?.id) return
+
+    const inviterFilter = user?.id && user.id !== ownProfile.id
+      ? `inviter_id.eq.${ownProfile.id},inviter_id.eq.${user.id}`
+      : `inviter_id.eq.${ownProfile.id}`
+
     supabase
       .from('invitations')
       .select('id', { count: 'exact' })
-      .eq('inviter_id', ownProfile.id)
+      .or(inviterFilter)
       .then(({ count }) => setInviteCount(count || 0))
-  }, [isOwnProfile, ownProfile?.id])
+  }, [isOwnProfile, ownProfile?.id, user?.id])
 
   const handleConnect = async () => {
     if (!ownProfile?.id || !id) return
@@ -161,9 +166,22 @@ export function Profile() {
     if (!ownProfile?.id || inviteCount >= 3 || generatingInvite) return
     setGeneratingInvite(true)
     const code = randomCode()
-    const { error } = await supabase
+
+    let { error } = await supabase
       .from('invitations')
       .insert({ inviter_id: ownProfile.id, code })
+      .select('code')
+      .single()
+
+    if (error && user?.id && user.id !== ownProfile.id) {
+      const fallback = await supabase
+        .from('invitations')
+        .insert({ inviter_id: user.id, code })
+        .select('code')
+        .single()
+      error = fallback.error
+    }
+
     if (!error) {
       setInviteCode(code)
       setInviteCount(c => c + 1)

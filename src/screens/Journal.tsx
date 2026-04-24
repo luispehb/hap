@@ -40,19 +40,17 @@ export function Journal() {
 
         if (participantError) throw participantError
 
-        const planIds = (participantData ?? []).map(p => p.plan_id)
-        const planFilter = planIds.length > 0
-          ? `creator_id.eq.${ownProfile!.id},id.in.(${planIds.join(',')})`
-          : `creator_id.eq.${ownProfile!.id}`
+        const joinedPlanIds = new Set((participantData ?? []).map(p => p.plan_id))
 
         const { data, error } = await supabase
           .from('plans')
           .select('*, participants:plan_participants(profile:profiles(display_name, origin_city))')
-          .or(planFilter)
           .order('created_at', { ascending: false })
 
         if (error) throw error
-        setPlans((data ?? []) as JournalPlan[])
+        setPlans(((data ?? []) as JournalPlan[]).filter(plan =>
+          plan.creator_id === ownProfile!.id || joinedPlanIds.has(plan.id)
+        ))
       } catch (err) {
         console.error('Journal load error:', err)
         setPlans([])

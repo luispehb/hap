@@ -28,7 +28,7 @@ export function Invite() {
         const { data: profileData } = await supabase
           .from('profiles')
           .select('display_name')
-          .eq('id', data.inviter_id)
+          .or(`id.eq.${data.inviter_id},user_id.eq.${data.inviter_id}`)
           .maybeSingle()
 
         setInviter(profileData ?? { display_name: 'Someone' })
