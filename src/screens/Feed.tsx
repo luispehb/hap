@@ -55,14 +55,39 @@ export function Feed() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (!profile?.id) return
-    supabase
-      .from('connections')
-      .select('id', { count: 'exact' })
-      .eq('user_b_id', profile.id)
-      .eq('user_a_wants_connect', true)
-      .eq('user_b_wants_connect', false)
-      .then(({ count }) => setNotifCount(count || 0))
-  }, [profile?.id])
+
+    async function loadNotificationCount() {
+      const { count: connectionCount } = await supabase
+        .from('connections')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_b_id', profile!.id)
+        .eq('user_a_wants_connect', true)
+        .eq('user_b_wants_connect', false)
+
+      const { data: planData } = await supabase
+        .from('plans')
+        .select('id')
+        .eq('city', profile!.current_city)
+        .gt('scheduled_at', new Date().toISOString())
+        .order('scheduled_at', { ascending: true })
+        .limit(5)
+
+      const { data: joined } = await supabase
+        .from('plan_participants')
+        .select('plan_id')
+        .eq('user_id', profile!.id)
+
+      const joinedIds = new Set((joined ?? []).map(j => j.plan_id))
+      const planCount = (planData ?? []).filter(p => !joinedIds.has(p.id)).length
+
+      setNotifCount((connectionCount || 0) + planCount)
+    }
+
+    loadNotificationCount().catch(err => {
+      console.error('Notification count error:', err)
+      setNotifCount(0)
+    })
+  }, [profile?.current_city, profile?.id])
 
   async function handleInstall() {
     if (!deferredPrompt) return

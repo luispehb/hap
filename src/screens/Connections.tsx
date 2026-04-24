@@ -49,42 +49,62 @@ function getSocialUrl(platform: string, handle: string): string {
 
 export function Connections() {
   const navigate = useNavigate()
-  const { profile: ownProfile } = useAuth()
+  const { profile: ownProfile, loading: authLoading } = useAuth()
 
   const [connections, setConnections] = useState<Connection[]>([])
   const [profiles, setProfiles] = useState<Record<string, ProfileRow>>({})
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    if (!ownProfile?.id) return
-    async function load() {
-      const { data } = await supabase
-        .from('connections')
-        .select('*')
-        .or(`user_a_id.eq.${ownProfile!.id},user_b_id.eq.${ownProfile!.id}`)
-
-      if (!data) { setLoading(false); return }
-      setConnections(data)
-
-      const otherIds = data.map((c: Connection) =>
-        c.user_a_id === ownProfile!.id ? c.user_b_id : c.user_a_id
-      )
-      if (otherIds.length === 0) { setLoading(false); return }
-
-      const { data: profileData } = await supabase
-        .from('profiles')
-        .select('id, display_name, origin_city, current_city, is_local, social_links, trust_score')
-        .in('id', otherIds)
-
-      if (profileData) {
-        const map: Record<string, ProfileRow> = {}
-        for (const p of profileData) map[p.id] = p
-        setProfiles(map)
-      }
+    if (authLoading) return
+    if (!ownProfile?.id) {
+      setError('We could not find your profile.')
       setLoading(false)
+      return
+    }
+
+    async function load() {
+      setLoading(true)
+      setError(null)
+
+      try {
+        const { data, error } = await supabase
+          .from('connections')
+          .select('*')
+          .or(`user_a_id.eq.${ownProfile!.id},user_b_id.eq.${ownProfile!.id}`)
+
+        if (error) throw error
+
+        const rows = (data ?? []) as Connection[]
+        setConnections(rows)
+
+        const otherIds = rows.map((c: Connection) =>
+          c.user_a_id === ownProfile!.id ? c.user_b_id : c.user_a_id
+        )
+        if (otherIds.length === 0) return
+
+        const { data: profileData, error: profileError } = await supabase
+          .from('profiles')
+          .select('id, display_name, origin_city, current_city, is_local, social_links, trust_score')
+          .in('id', otherIds)
+
+        if (profileError) throw profileError
+
+        const map: Record<string, ProfileRow> = {}
+        for (const p of profileData ?? []) map[p.id] = p
+        setProfiles(map)
+      } catch (err) {
+        console.error('Connections load error:', err)
+        setConnections([])
+        setProfiles({})
+        setError(err instanceof Error ? err.message : 'Failed to load connections.')
+      } finally {
+        setLoading(false)
+      }
     }
     load()
-  }, [ownProfile?.id])
+  }, [authLoading, ownProfile?.id])
 
   const handleAccept = async (conn: Connection) => {
     await supabase.from('connections').update({ user_b_wants_connect: true }).eq('id', conn.id)
@@ -105,6 +125,26 @@ export function Connections() {
     return (
       <div className="min-h-screen bg-cream flex items-center justify-center">
         <div className="w-6 h-6 border-2 border-sky border-t-transparent rounded-full animate-spin" />
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-cream">
+        <div className="bg-cream border-b border-[#E8E4DC] px-4 pt-14 pb-4 flex items-center gap-3">
+          <button
+            onClick={() => navigate(-1)}
+            className="w-8 h-8 bg-sand rounded-xl flex items-center justify-center cursor-pointer active:opacity-70"
+          >
+            <ChevronLeft size={18} className="text-ink" />
+          </button>
+          <p className="text-ink font-extrabold text-lg tracking-tight">Connections</p>
+        </div>
+        <div className="px-4 py-20 text-center">
+          <p className="text-ink font-bold text-sm">Connections unavailable</p>
+          <p className="text-muted text-xs mt-2">{error}</p>
+        </div>
       </div>
     )
   }

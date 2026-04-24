@@ -10,7 +10,7 @@ interface ConnectionRequest {
   id: string
   user_a_id: string
   user_b_id: string
-  created_at: string
+  connected_at: string
 }
 
 interface PlanInvite {
@@ -43,60 +43,77 @@ function timeAgo(dateStr: string): string {
 
 export function Notifications() {
   const navigate = useNavigate()
-  const { profile: ownProfile } = useAuth()
+  const { profile: ownProfile, loading: authLoading } = useAuth()
 
   const [requests, setRequests] = useState<ConnectionRequest[]>([])
   const [requestProfiles, setRequestProfiles] = useState<Record<string, ProfileRow>>({})
   const [planInvites, setPlanInvites] = useState<PlanInvite[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    if (!ownProfile?.id) return
+    if (authLoading) return
+    if (!ownProfile?.id) {
+      setError('We could not find your profile.')
+      setLoading(false)
+      return
+    }
+
     async function load() {
-      const { data: connData } = await supabase
-        .from('connections')
-        .select('id, user_a_id, user_b_id, created_at')
-        .eq('user_b_id', ownProfile!.id)
-        .eq('user_a_wants_connect', true)
-        .eq('user_b_wants_connect', false)
-        .order('created_at', { ascending: false })
+      setLoading(true)
+      setError(null)
 
-      const reqs = connData ?? []
-      setRequests(reqs)
+      try {
+        const { data: connData, error: connError } = await supabase
+          .from('connections')
+          .select('id, user_a_id, user_b_id, connected_at')
+          .eq('user_b_id', ownProfile!.id)
+          .eq('user_a_wants_connect', true)
+          .eq('user_b_wants_connect', false)
+          .order('connected_at', { ascending: false })
 
-      if (reqs.length > 0) {
-        const ids = reqs.map((r: ConnectionRequest) => r.user_a_id)
-        const { data: profileData } = await supabase
-          .from('profiles')
-          .select('id, display_name, origin_city, current_city, is_local, trust_score')
-          .in('id', ids)
-        if (profileData) {
+        if (connError) throw connError
+
+        const reqs = (connData ?? []) as ConnectionRequest[]
+        setRequests(reqs)
+
+        if (reqs.length > 0) {
+          const ids = reqs.map((r: ConnectionRequest) => r.user_a_id)
+          const { data: profileData, error: profileError } = await supabase
+            .from('profiles')
+            .select('id, display_name, origin_city, current_city, is_local, trust_score')
+            .in('id', ids)
+
+          if (profileError) throw profileError
+
           const map: Record<string, ProfileRow> = {}
-          for (const p of profileData) map[p.id] = p
+          for (const p of profileData ?? []) map[p.id] = p
           setRequestProfiles(map)
         }
-      }
 
-      const { data: planData } = await supabase
-        .from('plans')
-        .select('id, title, city, scheduled_at, activity_type')
-        .eq('city', ownProfile!.current_city)
-        .gt('scheduled_at', new Date().toISOString())
-        .order('scheduled_at', { ascending: true })
-        .limit(5)
+        const { data: planData, error: planError } = await supabase
+          .from('plans')
+          .select('id, title, city, scheduled_at, activity_type')
+          .eq('city', ownProfile!.current_city)
+          .gt('scheduled_at', new Date().toISOString())
+          .order('scheduled_at', { ascending: true })
+          .limit(5)
 
-      if (planData) {
-        const { data: joined } = await supabase
+        if (planError) throw planError
+
+        const { data: joined, error: joinedError } = await supabase
           .from('plan_participants')
           .select('plan_id')
           .eq('user_id', ownProfile!.id)
 
+        if (joinedError) throw joinedError
+
         const joinedIds = new Set((joined ?? []).map((j: { plan_id: string }) => j.plan_id))
 
         setPlanInvites(
-          planData
-            .filter((p: { id: string }) => !joinedIds.has(p.id))
-            .map((p: { id: string; title: string; city: string; scheduled_at: string; activity_type: string }) => ({
+          ((planData ?? []) as { id: string; title: string; city: string; scheduled_at: string; activity_type: string }[])
+            .filter(p => !joinedIds.has(p.id))
+            .map(p => ({
               id: p.id,
               plan_id: p.id,
               plan_title: p.title,
@@ -105,12 +122,18 @@ export function Notifications() {
               activity_type: p.activity_type,
             }))
         )
+      } catch (err) {
+        console.error('Notifications load error:', err)
+        setRequests([])
+        setRequestProfiles({})
+        setPlanInvites([])
+        setError(err instanceof Error ? err.message : 'Failed to load notifications.')
+      } finally {
+        setLoading(false)
       }
-
-      setLoading(false)
     }
     load()
-  }, [ownProfile?.id])
+  }, [authLoading, ownProfile?.current_city, ownProfile?.id])
 
   const handleAccept = async (conn: ConnectionRequest) => {
     await supabase.from('connections').update({ user_b_wants_connect: true }).eq('id', conn.id)
@@ -129,6 +152,26 @@ export function Notifications() {
     return (
       <div className="min-h-screen bg-cream flex items-center justify-center">
         <div className="w-6 h-6 border-2 border-sky border-t-transparent rounded-full animate-spin" />
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-cream">
+        <div className="bg-cream border-b border-[#E8E4DC] px-4 pt-14 pb-4 flex items-center gap-3">
+          <button
+            onClick={() => navigate(-1)}
+            className="w-8 h-8 bg-sand rounded-xl flex items-center justify-center cursor-pointer active:opacity-70"
+          >
+            <ChevronLeft size={18} className="text-ink" />
+          </button>
+          <p className="text-ink font-extrabold text-lg tracking-tight">Notifications</p>
+        </div>
+        <div className="px-4 py-20 text-center">
+          <p className="text-ink font-bold text-sm">Notifications unavailable</p>
+          <p className="text-muted text-xs mt-2">{error}</p>
+        </div>
       </div>
     )
   }
@@ -181,7 +224,7 @@ export function Notifications() {
                         <p className="text-muted text-xs">
                           {other.origin_city} · {other.is_local ? 'Local' : other.current_city}
                         </p>
-                        <p className="text-muted text-[10px] mt-0.5">{timeAgo(req.created_at)}</p>
+                        <p className="text-muted text-[10px] mt-0.5">{timeAgo(req.connected_at)}</p>
                       </div>
                       <div className="bg-[#F0FFD0] px-2 py-1 rounded-lg">
                         <p className="text-[#3a6010] text-[10px] font-bold">{other.trust_score}</p>

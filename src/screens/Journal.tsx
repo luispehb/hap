@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { useAuth } from '../contexts/AuthContext'
 import { BottomNav } from '../components/ui/BottomNav'
 import { Avatar } from '../components/ui/Avatar'
 import { getPlanPhoto } from '../lib/photos'
@@ -14,20 +15,54 @@ interface JournalPlan extends Plan {
 
 export function Journal() {
   const navigate = useNavigate()
+  const { profile: ownProfile, loading: authLoading } = useAuth()
   const [plans, setPlans] = useState<JournalPlan[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    async function load() {
-      const { data } = await supabase
-        .from('plans')
-        .select('*, participants:plan_participants(profile:profiles(display_name, origin_city))')
-        .order('created_at', { ascending: false })
-      setPlans(data ?? [])
+    if (authLoading) return
+    if (!ownProfile?.id) {
+      setError('We could not find your profile.')
       setLoading(false)
+      return
+    }
+
+    async function load() {
+      setLoading(true)
+      setError(null)
+
+      try {
+        const { data: participantData, error: participantError } = await supabase
+          .from('plan_participants')
+          .select('plan_id')
+          .eq('user_id', ownProfile!.id)
+
+        if (participantError) throw participantError
+
+        const planIds = (participantData ?? []).map(p => p.plan_id)
+        const planFilter = planIds.length > 0
+          ? `creator_id.eq.${ownProfile!.id},id.in.(${planIds.join(',')})`
+          : `creator_id.eq.${ownProfile!.id}`
+
+        const { data, error } = await supabase
+          .from('plans')
+          .select('*, participants:plan_participants(profile:profiles(display_name, origin_city))')
+          .or(planFilter)
+          .order('created_at', { ascending: false })
+
+        if (error) throw error
+        setPlans((data ?? []) as JournalPlan[])
+      } catch (err) {
+        console.error('Journal load error:', err)
+        setPlans([])
+        setError(err instanceof Error ? err.message : 'Failed to load your journal.')
+      } finally {
+        setLoading(false)
+      }
     }
     load()
-  }, [])
+  }, [authLoading, ownProfile?.id])
 
   return (
     <div className="min-h-screen bg-cream flex flex-col">
@@ -44,6 +79,17 @@ export function Journal() {
         {loading ? (
           <div className="flex items-center justify-center py-16">
             <div className="w-6 h-6 border-2 border-sky border-t-transparent rounded-full animate-spin" />
+          </div>
+        ) : error ? (
+          <div className="flex flex-col items-center justify-center py-20 gap-3 text-center">
+            <p className="text-ink font-bold text-sm">Journal unavailable</p>
+            <p className="text-muted text-xs max-w-[260px]">{error}</p>
+            <button
+              onClick={() => window.location.reload()}
+              className="mt-2 bg-ink text-white text-xs font-bold px-5 py-2.5 rounded-xl cursor-pointer active:opacity-80 transition"
+            >
+              Try again
+            </button>
           </div>
         ) : plans.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 gap-3">
