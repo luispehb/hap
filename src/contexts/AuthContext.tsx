@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 import { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react'
 import type { ReactNode } from 'react'
 import type { User, Session } from '@supabase/supabase-js'
@@ -28,8 +29,10 @@ interface AuthContextType {
   profile: Profile | null
   session: Session | null
   loading: boolean
+  error: string | null
   signOut: () => Promise<void>
   refreshProfile: () => Promise<void>
+  retryAuth: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -37,8 +40,10 @@ const AuthContext = createContext<AuthContextType>({
   profile: null,
   session: null,
   loading: true,
+  error: null,
   signOut: async () => {},
   refreshProfile: async () => {},
+  retryAuth: async () => {},
 })
 
 const CACHE_KEY = 'hap-profile-v1'
@@ -47,14 +52,18 @@ const getCache = (): Profile | null => {
   try {
     const c = localStorage.getItem(CACHE_KEY)
     return c ? JSON.parse(c) : null
-  } catch { return null }
+  } catch {
+    return null
+  }
 }
 
 const saveCache = (p: Profile | null) => {
   try {
     if (p) localStorage.setItem(CACHE_KEY, JSON.stringify(p))
     else localStorage.removeItem(CACHE_KEY)
-  } catch {}
+  } catch {
+    // Ignore cache write failures so auth does not get blocked by storage issues.
+  }
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -63,19 +72,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(cached)
   const [session, setSession] = useState<Session | null>(null)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   const fetchingForRef = useRef<string | null>(null)
   const retryCountRef = useRef<number>(0)
   const mountedRef = useRef(true)
+  const lastEventRef = useRef('')
 
   const updateProfile = useCallback((p: Profile | null) => {
     setProfile(p)
     saveCache(p)
   }, [])
 
-  const fetchProfile = useCallback(async (userId: string, isRetry = false) => {
+  const fetchProfile = useCallback(async function runFetchProfile(userId: string, isRetry = false) {
     if (!isRetry && fetchingForRef.current === userId) return
     fetchingForRef.current = userId
+    setError(null)
     try {
       const { data, error } = await supabase
         .from('profiles')
@@ -93,6 +105,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } else if (error) {
         console.error('fetchProfile DB error:', error)
         fetchingForRef.current = null
+        setError(error.message)
         setLoading(false)
       } else {
         fetchingForRef.current = null
@@ -101,10 +114,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           const delay = retryCountRef.current * 3000
           console.log(`Profile not found, retry ${retryCountRef.current}/4 in ${delay}ms`)
           setTimeout(() => {
-            if (mountedRef.current) fetchProfile(userId, true)
+            if (mountedRef.current) void runFetchProfile(userId, true)
           }, delay)
         } else {
           retryCountRef.current = 0
+          setError('We could not load your profile right now.')
           setLoading(false)
         }
       }
@@ -112,6 +126,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.error('fetchProfile error:', err)
       if (mountedRef.current) {
         fetchingForRef.current = null
+        setError(err instanceof Error ? err.message : 'Failed to load your profile')
         setLoading(false)
       }
     }
@@ -121,6 +136,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (user?.id) await fetchProfile(user.id)
   }, [user, fetchProfile])
 
+  const initialize = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!mountedRef.current) return
+
+      setSession(session)
+      setUser(session?.user ?? null)
+
+      if (session?.user) {
+        await fetchProfile(session.user.id)
+      } else {
+        setLoading(false)
+      }
+    } catch (err) {
+      console.error('Auth init error:', err)
+      if (mountedRef.current) {
+        setError(err instanceof Error ? err.message : 'Failed to restore your session')
+        setLoading(false)
+      }
+    }
+  }, [fetchProfile])
+
+  const retryAuth = useCallback(async () => {
+    fetchingForRef.current = null
+    retryCountRef.current = 0
+    await initialize()
+  }, [initialize])
+
   useEffect(() => {
     mountedRef.current = true
 
@@ -128,32 +173,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (mountedRef.current) {
         console.warn('Auth init: failsafe triggered')
         fetchingForRef.current = null
+        setError('Loading your profile is taking longer than usual.')
         setLoading(false)
       }
     }, 10000)
 
-    async function initialize() {
-      try {
-        const { data: { session } } = await supabase.auth.getSession()
-        if (!mountedRef.current) return
-        setSession(session)
-        setUser(session?.user ?? null)
-        if (session?.user) {
-          await fetchProfile(session.user.id)
-        } else {
-          setLoading(false)
-        }
-      } catch (err) {
-        console.error('Auth init error:', err)
-        if (mountedRef.current) setLoading(false)
-      } finally {
-        clearTimeout(failsafe)
-      }
-    }
-
-    initialize()
-
-    const lastEventRef = { current: '' }
+    initialize().finally(() => clearTimeout(failsafe))
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
@@ -163,6 +188,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           if (lastEventRef.current === 'SIGNED_IN') return
           lastEventRef.current = 'SIGNED_IN'
           if (session?.user) {
+            setLoading(true)
+            setError(null)
             setSession(session)
             setUser(session.user)
             await new Promise(r => setTimeout(r, 500))
@@ -174,7 +201,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setUser(null)
           updateProfile(null)
           retryCountRef.current = 0
+          setError(null)
           setLoading(false)
+        } else if (event === 'INITIAL_SESSION') {
+          lastEventRef.current = 'INITIAL_SESSION'
         }
       }
     )
@@ -183,14 +213,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       mountedRef.current = false
       subscription.unsubscribe()
     }
-  }, [fetchProfile, updateProfile])
+  }, [fetchProfile, initialize, updateProfile])
 
   const signOut = async () => {
     await supabase.auth.signOut()
   }
 
   return (
-    <AuthContext.Provider value={{ user, profile, session, loading, signOut, refreshProfile }}>
+    <AuthContext.Provider value={{ user, profile, session, loading, error, signOut, refreshProfile, retryAuth }}>
       {children}
     </AuthContext.Provider>
   )

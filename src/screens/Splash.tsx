@@ -6,7 +6,7 @@ import { LoadingScreen } from '../components/LoadingScreen'
 
 export function Splash() {
   const navigate = useNavigate()
-  const { user, profile, loading } = useAuth()
+  const { user, profile, loading, error, retryAuth } = useAuth()
 
   const [email, setEmail] = useState('')
   const [otpSent, setOtpSent] = useState(false)
@@ -31,7 +31,7 @@ export function Splash() {
     </div>
   )
 
-  if (loading) return <LoadingScreen />
+  if (loading) return <LoadingScreen message={error ?? 'Taking longer than usual...'} onRetry={retryAuth} />
 
   async function handleGoogleSignIn() {
     setOtpError('')

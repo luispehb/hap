@@ -187,7 +187,7 @@ export function Notifications() {
                         <p className="text-[#3a6010] text-[10px] font-bold">{other.trust_score}</p>
                       </div>
                     </div>
-                    <div clssName="flex gap-2">
+                    <div className="flex gap-2">
                       <Button variant="outline" size="md" fullWidth onClick={() => handleDecline(req)}>
                         Decline
                       </Button>
