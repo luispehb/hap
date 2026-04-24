@@ -46,7 +46,7 @@ export function Step4Location() {
     setErrorMsg('')
     const stored = onboardingStore.get()
     try {
-      const { error } = await supabase
+      const { data: profileData, error } = await supabase
         .from('profiles')
         .upsert({
           user_id: user.id,
@@ -62,6 +62,8 @@ export function Step4Location() {
           is_verified: false,
           membership_status: 'trial',
         }, { onConflict: 'user_id' })
+        .select('id')
+        .single()
 
       if (error) {
         setErrorMsg(error.message)
@@ -82,11 +84,11 @@ export function Step4Location() {
       onboardingStore.clear()
 
       const pendingInviteCode = sessionStorage.getItem('hapInviteCode')
-      if (pendingInviteCode) {
+      if (pendingInviteCode && profileData?.id) {
         sessionStorage.removeItem('hapInviteCode')
         supabase
           .from('invitations')
-          .update({ used: true, used_by: user.id })
+          .update({ used: true, used_by: profileData.id })
           .eq('code', pendingInviteCode)
           .eq('used', false)
           .then(({ error }) => { if (error) console.error('Failed to mark invite used:', error) })

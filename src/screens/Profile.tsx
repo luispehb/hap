@@ -167,6 +167,9 @@ export function Profile() {
     if (!error) {
       setInviteCode(code)
       setInviteCount(c => c + 1)
+    } else {
+      console.error('Invite generation error:', error)
+      showToast(error.message || 'Could not generate invite link')
     }
     setGeneratingInvite(false)
   }
