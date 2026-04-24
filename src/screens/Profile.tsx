@@ -581,7 +581,14 @@ export function Profile() {
 
       {isOwnProfile
         ? (
-          <BottomNav active="profile" />
+          <>
+            {toast && (
+              <div className="fixed bottom-24 left-1/2 -translate-x-1/2 bg-ink text-white text-xs font-bold px-5 py-3 rounded-xl z-50 whitespace-nowrap shadow-lg">
+                {toast}
+              </div>
+            )}
+            <BottomNav active="profile" />
+          </>
         )
         : (
           <>
