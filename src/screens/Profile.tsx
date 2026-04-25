@@ -65,6 +65,63 @@ function getSocialUrl(platform: string, handle: string): string {
   return map[platform] ?? handle
 }
 
+function StatsRow({ profileId, isOwnProfile }: { profileId: string; isOwnProfile: boolean }) {
+  const [plansCount, setPlansCount] = useState(0)
+  const [connectionsCount, setConnectionsCount] = useState(0)
+  const [avgRating, setAvgRating] = useState<number | null>(null)
+
+  useEffect(() => {
+    if (!profileId) return
+
+    supabase
+      .from('plan_participants')
+      .select('id', { count: 'exact' })
+      .eq('user_id', profileId)
+      .then(({ count }) => setPlansCount(count || 0))
+
+    supabase
+      .from('connections')
+      .select('id', { count: 'exact' })
+      .or(`user_a_id.eq.${profileId},user_b_id.eq.${profileId}`)
+      .eq('user_a_wants_connect', true)
+      .eq('user_b_wants_connect', true)
+      .then(({ count }) => setConnectionsCount(count || 0))
+
+    supabase
+      .from('ratings')
+      .select('score')
+      .eq('rated_id', profileId)
+      .then(({ data }) => {
+        if (data && data.length > 0) {
+          const avg = data.reduce((sum: number, r: { score: number }) => sum + r.score, 0) / data.length
+          setAvgRating(Math.round(avg * 10) / 10)
+        }
+      })
+  }, [profileId])
+
+  const stats = [
+    { label: 'Plans', value: plansCount.toString() },
+    { label: 'Rating', value: avgRating !== null ? avgRating.toFixed(1) : '—' },
+    { label: isOwnProfile ? 'Connections' : 'Friends', value: connectionsCount.toString() },
+  ]
+
+  return (
+    <div className="grid grid-cols-3 gap-3">
+      {stats.map(stat => (
+        <div
+          key={stat.label}
+          className="bg-white border border-[#E8E4DC] rounded-2xl p-3 text-center"
+        >
+          <p className="text-ink text-xl font-extrabold tracking-tight">{stat.value}</p>
+          <p className="text-muted text-[9px] font-bold uppercase tracking-wider mt-1">
+            {stat.label}
+          </p>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 export function Profile() {
   const { id } = useParams<{ id?: string }>()
   const navigate = useNavigate()
@@ -390,23 +447,7 @@ export function Profile() {
         )}
 
         {/* Stats row */}
-        <div className="grid grid-cols-3 gap-3">
-          {[
-            { label: 'Plans', value: '0' },
-            { label: 'Rating', value: '—' },
-            { label: 'Countries', value: '1' },
-          ].map(stat => (
-            <div
-              key={stat.label}
-              className="bg-white border border-[#E8E4DC] rounded-2xl p-3 text-center"
-            >
-              <p className="text-ink text-xl font-extrabold tracking-tight">{stat.value}</p>
-              <p className="text-muted text-[9px] font-bold uppercase tracking-wider mt-1">
-                {stat.label}
-              </p>
-            </div>
-          ))}
-        </div>
+        <StatsRow profileId={profile.id} isOwnProfile={isOwnProfile} />
 
         {/* Journal + Connections links */}
         {isOwnProfile && (
