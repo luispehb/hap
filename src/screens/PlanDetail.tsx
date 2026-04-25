@@ -52,6 +52,11 @@ export function PlanDetail() {
   const [toast, setToast] = useState(false)
   const [toastMsg, setToastMsg] = useState('')
 
+  const isPast = plan ? new Date(plan.scheduled_at) < new Date() : false
+  const isParticipant = profile ? participants.some(p => p.profile?.id === profile.id) : false
+  const isCreator = plan && profile ? (plan as unknown as { creator_id?: string }).creator_id === profile.id : false
+  const canRate = isPast && (isParticipant || isCreator)
+
   function showToast(msg: string) {
     setToastMsg(msg)
     setToast(true)
@@ -253,29 +258,53 @@ export function PlanDetail() {
 
       {/* Sticky bottom actions */}
       <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[430px] bg-cream border-t border-[#E8E4DC] px-4 py-4 flex flex-col gap-2">
-        {joined ? (
+        {canRate ? (
+          <>
+          <Button
+              variant="cta"
+              size="lg"
+              fullWidth
+              onClick={() => navigate(`/rate/${planId}`)}
+            >
+              ⭐ Rate your experience
+            </Button>
+            <button
+              onClick={() => navigate(`/chat/${planId}`)}
+              className="w-full py-3 bg-white border border-[#E8E4DC] rounded-2xl text-ink font-bold text-sm flex items-center justify-center gap-2 active:bg-sand transition cursor-pointer"
+            >
+              <MessageCircle size={16} className="text-sky" />
+              Open group chat
+            </button>
+          </>
+        ) : isPast ? (
+          <Button variant="outline" size="lg" fullWidth disabled>
+            This plan has ended
+          </Button>
+        ) : joined ? (
           <Button variant="outline" size="lg" fullWidth disabled>
             Request sent ✓
           </Button>
         ) : (
-          <Button
-            variant="cta"
-            size="lg"
-            fullWidth
-            onClick={handleJoin}
-            disabled={joining || openSpots <= 0}
-          >
-            {openSpots <= 0 ? 'Plan is full' : joining ? 'Sending…' : 'Join this plan'}
-          </Button>
-        )}
-        {(joined || confirmedCount > 0) && (
-          <button
-            onClick={() => navigate(`/chat/${planId}`)}
-            className="w-full py-3 bg-white border border-[#E8E4DC] rounded-2xl text-ink font-bold text-sm flex items-center justify-center gap-2 active:bg-sand transition cursor-pointer"
-          >
-            <MessageCircle size={16} className="text-sky" />
-            Open group chat
-          </button>
+          <>
+            <Button
+              variant="cta"
+              size="lg"
+          fullWidth
+              onClick={handleJoin}
+              disabled={joining || openSpots <= 0}
+            >
+              {openSpots <= 0 ? 'Plan is full' : joining ? 'Sending…' : 'Join this plan'}
+            </Button>
+            {confirmedCount > 0 && (
+              <button
+                onClick={() => navigate(`/chat/${planId}`)}
+                className="w-full py-3 bg-white border border-[#E8E4DC] rounded-2xl text-ink font-bold text-sm flex items-center justify-center gap-2 active:bg-sand transition cursor-pointer"
+              >
+                <MessageCircle size={16} className="text-sky" />
+                Open group chat
+              </button>
+            )}
+          </>
         )}
       </div>
 

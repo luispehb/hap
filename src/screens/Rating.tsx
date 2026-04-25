@@ -207,6 +207,8 @@ export function Rating() {
     for (const profile of profiles) {
       const r = ratings[profile.id]
       if (!r || r.stars === 0) continue
+
+      // Insert rating
       await supabase.from('ratings').insert({
         plan_id: planId,
         rater_id: raterProfile?.id ?? null,
@@ -215,16 +217,63 @@ export function Rating() {
         tags: r.tags,
         wants_connection: r.connectChoice === 'yes',
       })
+
+      // Update trust score of rated person based on stars
+      const starsDelta: Record<number, number> = { 1: -10, 2: -6, 3: 0, 4: 5, 5: 8 }
+      const delta = starsDelta[r.stars] ?? 0
+      if (delta !== 0) {
+        await supabase.rpc('update_trust_score', {
+          p_profile_id: profile.id,
+          p_delta: delta,
+        })
+      }
+
+      // Handle double opt-in connection
+      if (r.connectChoice === 'yes' && raterProfile?.id) {
+        // Check if the other person also wants to connect
+        const { data: otherRating } = await supabase
+          .from('ratings')
+          .select('wants_connection')
+          .eq('plan_id', planId)
+          .eq('rater_id', profile.id)
+          .eq('rated_id', raterProfile.id)
+          .maybeSingle()
+
+        if (otherRating?.wants_connection) {
+          // Both said yes — create mutual connection if not exists
+          const { data: existing } = await supabase
+            .from('connections')
+            .select('id')
+            .or(`and(user_a_id.eq.${raterProfile.id},user_b_id.eq.${profile.id}),and(user_a_id.eq.${profile.id},user_b_id.eq.${raterProfile.id})`)
+            .maybeSingle()
+
+          if (!existing) {
+            await supabase.from('connections').insert({
+              user_a_id: raterProfile.id,
+              user_b_id: profile.id,
+              user_a_wants_connect: true,
+              user_b_wants_connect: true,
+            })
+          }
+        }
+      }
+    }
+
+    // +8 trust score for rater for completing a plan
+    if (raterProfile?.id) {
+      await supabase.rpc('update_trust_score', {
+        p_profile_id: raterProfile.id,
+        p_delta: 8,
+      })
     }
 
     setSubmitting(false)
 
-    // Simulate double opt-in match for demo: show reveal if any "yes"
     const yesProfile = profiles.find(p => ratings[p.id]?.connectChoice === 'yes')
     if (yesProfile) {
       setRevealProfile(yesProfile)
     } else {
-      navigate('/feed', { state: { toast: 'Thanks for rating ✓ Your Trust Score has been updated' } })
+      navigate('/feed', { state: { toast: 'Thanks for rating ✓ Trust Score updated' } })
     }
   }
 
