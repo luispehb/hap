@@ -17,6 +17,7 @@ import { Journal } from './screens/Journal'
 import { Connections } from './screens/Connections'
 import { Admin } from './screens/Admin'
 import { Chats } from './screens/Chats'
+import { DirectChat } from './screens/DirectChat'
 import { Invite } from './screens/Invite'
 import { Notifications } from './screens/Notifications'
 
@@ -44,6 +45,7 @@ function App() {
                 <Route path="/connections" element={<ProtectedRoute><Connections /></ProtectedRoute>} />
                 <Route path="/admin" element={<ProtectedRoute><Admin /></ProtectedRoute>} />
                 <Route path="/notifications" element={<ProtectedRoute><Notifications /></ProtectedRoute>} />
+                <Route path="/direct/:profileId" element={<ProtectedRoute><DirectChat /></ProtectedRoute>} />
                 <Route path="/invite/:code" element={<Invite />} />
                 <Route path="/chats" element={<ProtectedRoute><Chats /></ProtectedRoute>} />
               </Routes>

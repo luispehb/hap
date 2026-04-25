@@ -235,6 +235,12 @@ export function Connections() {
                         <p className="text-muted text-xs">{other.origin_city} · {other.is_local ? 'Local' : other.current_city}</p>
                       </div>
                     </div>
+                    <button
+                      onClick={() => navigate(`/direct/${other.id}`)}
+                      className="w-full mb-2 py-2.5 bg-ink text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 active:opacity-80 transition cursor-pointer"
+                    >
+                      <span>💬</span> Message
+                    </button>
                     {socialEntries.length > 0 ? (
                       <div className="flex flex-wrap gap-2">
                         {socialEntries.map(([platform, handle]) => (
