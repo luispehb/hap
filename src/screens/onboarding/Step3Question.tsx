@@ -48,10 +48,6 @@ export function Step3Question() {
       trust_score: trustScore,
     })
 
-    supabase.functions.invoke('analyze-mindset', {
-      body: { userId: user?.id, mindsetAnswer }
-    }).catch(console.error)
-
     navigate('/onboarding/4')
   }
 

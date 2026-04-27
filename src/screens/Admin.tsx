@@ -20,6 +20,7 @@ interface PendingProfile {
 
 interface MindsetProfile {
   id: string
+  user_id: string
   display_name: string
   current_city: string
   created_at: string
@@ -184,7 +185,7 @@ export function Admin() {
         .order('created_at', { ascending: true }),
       supabase
         .from('profiles')
-        .select('id, display_name, current_city, created_at, trust_score, mindset_answer, mindset_summary, mindset_tags, mindset_recommendation')
+        .select('id, user_id, display_name, current_city, created_at, trust_score, mindset_answer, mindset_summary, mindset_tags, mindset_recommendation')
         .eq('has_invite', false)
         .is('mindset_approved', null)
         .not('mindset_answer', 'is', null)
@@ -278,6 +279,22 @@ export function Admin() {
       .update({ mindset_approved: false })
       .eq('id', profileId)
     setMindsetProfiles(prev => prev.filter(p => p.id !== profileId))
+  }
+
+  const handleReanalyze = async (p: MindsetProfile) => {
+    if (!p.mindset_answer) return
+    setMindsetProfiles(prev => prev.map(x => x.id === p.id ? { ...x, mindset_recommendation: null, mindset_summary: null, mindset_tags: null } : x))
+    supabase.functions.invoke('analyze-mindset', {
+      body: { userId: p.user_id ?? p.id, mindsetAnswer: p.mindset_answer }
+    }).then(() => {
+      supabase.from('profiles')
+        .select('mindset_summary, mindset_tags, mindset_recommendation')
+        .eq('id', p.id)
+        .single()
+        .then(({ data }) => {
+          if (data) setMindsetProfiles(prev => prev.map(x => x.id === p.id ? { ...x, ...data } : x))
+        })
+    }).catch(console.error)
   }
 
   if (!loading && !isAdmin) {
@@ -497,7 +514,16 @@ export function Admin() {
                             </div>
 
                             {/* Actions */}
-                            <div style={{ display: 'flex', gap: 8 }}>
+                            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                              {!p.mindset_recommendation && (
+                                <button
+                                  onClick={() => handleReanalyze(p)}
+                                  className="cursor-pointer transition-all hover:opacity-80"
+                                  style={{ padding: '6px 14px', borderRadius: 8, fontSize: 12, fontWeight: 500, border: '1px solid #B0AA9E', color: '#5A554E', background: 'white' }}
+                                >
+                                  ↻ Re-analizar
+                                </button>
+                              )}
                               <button
                                 onClick={() => handleMindsetReject(p.id)}
                                 className="cursor-pointer transition-all hover:bg-[#FCEBEB]"

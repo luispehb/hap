@@ -88,6 +88,10 @@ export function Step4Location() {
         }).then(({ error: admErr }) => {
           if (admErr) console.error('Admissions insert error:', admErr)
         })
+
+        supabase.functions.invoke('analyze-mindset', {
+          body: { userId: user.id, mindsetAnswer: stored.bio_question }
+        }).catch(console.error)
       }
 
       onboardingStore.clear()
