@@ -25,7 +25,7 @@ function App() {
   return (
     <AuthProvider>
       <BrowserRouter>
-        <div className="min-h-screen bg-sand flex justify-center">
+        <div className="min-h-screen bg-sand">
           <Routes>
             <Route path="/admin" element={<ProtectedRoute><Admin /></ProtectedRoute>} />
             <Route path="*" element={
