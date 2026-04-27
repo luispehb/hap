@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { FunctionsHttpError } from '@supabase/supabase-js'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
 
@@ -66,6 +67,21 @@ function timeAgo(dateStr: string): string {
   if (hours < 24) return `hace ${hours}h`
   const days = Math.floor(hours / 24)
   return `hace ${days}d`
+}
+
+async function getFunctionErrorMessage(error: unknown): Promise<string> {
+  if (error instanceof FunctionsHttpError) {
+    try {
+      const body = await error.context.json()
+      if (body?.detail) return `${body.error ?? 'Error'}: ${body.detail}`
+      if (body?.body) return `${body.error ?? 'Error'}: ${body.body}`
+      if (body?.error) return String(body.error)
+    } catch {
+      return error.message
+    }
+  }
+
+  return error instanceof Error ? error.message : String(error)
 }
 
 function TagChip({ tag }: { tag: string }) {
@@ -290,7 +306,7 @@ export function Admin() {
         body: { userId: p.user_id, mindsetAnswer: p.mindset_answer }
       })
       if (fnError) {
-        alert(`Error al re-analizar: ${fnError.message}`)
+        alert(`Error al re-analizar: ${await getFunctionErrorMessage(fnError)}`)
         return
       }
       const { data } = await supabase

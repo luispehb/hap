@@ -4,6 +4,14 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+}
+
+function jsonResponse(body: Record<string, unknown>, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+  })
 }
 
 serve(async (req) => {
@@ -15,13 +23,20 @@ serve(async (req) => {
     const { userId, mindsetAnswer } = await req.json()
 
     if (!userId || !mindsetAnswer) {
-      return new Response(JSON.stringify({ error: 'Missing userId or mindsetAnswer' }), { status: 400 })
+      return jsonResponse({ error: 'Missing userId or mindsetAnswer' }, 400)
     }
 
-    const apiKey = Deno.env.get('ANTHROPIC_API_KEY')
+    const apiKey =
+      Deno.env.get('ANTHROPIC_API_KEY') ??
+      Deno.env.get('ANTHROPIC_SECRET_KEY') ??
+      Deno.env.get('CLAUDE_API_KEY')
+
     if (!apiKey) {
-      console.error('ANTHROPIC_API_KEY secret not set')
-      return new Response(JSON.stringify({ error: 'ANTHROPIC_API_KEY not configured' }), { status: 500 })
+      console.error('Anthropic API key secret not set')
+      return jsonResponse({
+        error: 'Anthropic API key not configured',
+        detail: 'Set ANTHROPIC_API_KEY in Supabase Edge Function secrets.',
+      }, 500)
     }
 
     const anthropicRes = await fetch('https://api.anthropic.com/v1/messages', {
@@ -51,7 +66,7 @@ Responde ÚNICAMENTE con el JSON puro. Sin markdown, sin texto adicional.`,
     if (!anthropicRes.ok) {
       const errBody = await anthropicRes.text()
       console.error('Anthropic API error:', anthropicRes.status, errBody)
-      return new Response(JSON.stringify({ error: 'Anthropic API error', status: anthropicRes.status, body: errBody }), { status: 500 })
+      return jsonResponse({ error: 'Anthropic API error', status: anthropicRes.status, body: errBody }, 500)
     }
 
     const data = await anthropicRes.json()
@@ -65,7 +80,7 @@ Responde ÚNICAMENTE con el JSON puro. Sin markdown, sin texto adicional.`,
       analysis = JSON.parse(jsonText)
     } catch (parseErr) {
       console.error('JSON parse failed. Raw text:', rawText, 'Error:', parseErr)
-      return new Response(JSON.stringify({ error: 'Failed to parse Claude response', raw: rawText }), { status: 500 })
+      return jsonResponse({ error: 'Failed to parse Claude response', raw: rawText }, 500)
     }
 
     const supabase = createClient(
@@ -84,14 +99,12 @@ Responde ÚNICAMENTE con el JSON puro. Sin markdown, sin texto adicional.`,
 
     if (dbError) {
       console.error('DB update error:', dbError)
-      return new Response(JSON.stringify({ error: 'DB update failed', detail: dbError.message }), { status: 500 })
+      return jsonResponse({ error: 'DB update failed', detail: dbError.message }, 500)
     }
 
-    return new Response(JSON.stringify({ ok: true, recommendation: analysis.recommendation }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    })
+    return jsonResponse({ ok: true, recommendation: analysis.recommendation })
   } catch (err) {
     console.error('Unhandled error in analyze-mindset:', err)
-    return new Response(JSON.stringify({ error: String(err) }), { status: 500 })
+    return jsonResponse({ error: String(err) }, 500)
   }
 })
