@@ -164,7 +164,7 @@ function StatsRow({ profileId, isOwnProfile }: { profileId: string; isOwnProfile
 export function Profile() {
   const { id } = useParams<{ id?: string }>()
   const navigate = useNavigate()
-  const { profile: ownProfile, signOut, user } = useAuth()
+  const { profile: ownProfile, signOut, user, refreshProfile } = useAuth()
   const isOwnProfile = !id
 
   const fetchedProfile = useProfile(id ?? '')
@@ -239,7 +239,36 @@ export function Profile() {
       .select('*')
       .eq('user_id', profile.id)
       .order('arrives_at', { ascending: true })
-      .then(({ data }) => setTrips(data ?? []))
+      .then(({ data }) => {
+        const loadedTrips = data ?? []
+        setTrips(loadedTrips)
+
+        if (!isOwnProfile) return
+
+        const todayStr = new Date().toISOString().split('T')[0]
+
+        // Determine what current_city should be right now
+        const activeTrip = loadedTrips.find(t =>
+          t.arrives_at <= todayStr && (!t.departs_at || t.departs_at >= todayStr)
+        )
+        const correctCity = activeTrip?.city ?? (ownProfile?.home_city ?? '')
+
+        // Sync current_city if it drifted (trip started or ended)
+        if (correctCity && correctCity !== profile.current_city) {
+          supabase.from('profiles')
+            .update({ current_city: correctCity })
+            .eq('id', profile.id)
+            .then(() => refreshProfile())
+        }
+
+        // Keep is_current flags in DB accurate
+        loadedTrips.forEach(t => {
+          const shouldBeCurrent = t.arrives_at <= todayStr && (!t.departs_at || t.departs_at >= todayStr)
+          if (t.is_current !== shouldBeCurrent) {
+            supabase.from('trips').update({ is_current: shouldBeCurrent }).eq('id', t.id)
+          }
+        })
+      })
   }, [profile?.id])
 
   const handleConnect = async () => {
@@ -344,6 +373,7 @@ export function Profile() {
         .single()
       if (is_current) {
         await supabase.from('profiles').update({ current_city: city }).eq('id', profile.id)
+        refreshProfile()
       }
       if (data) {
         setTrips(prev => prev.map(t => t.id === editingTrip.id ? data : t)
@@ -357,6 +387,7 @@ export function Profile() {
         .single()
       if (is_current) {
         await supabase.from('profiles').update({ current_city: city }).eq('id', profile.id)
+        refreshProfile()
       }
       if (data) {
         setTrips(prev => [...prev, data].sort((a, b) => a.arrives_at.localeCompare(b.arrives_at)))
@@ -371,8 +402,9 @@ export function Profile() {
     if (!confirm(`¿Eliminar viaje a ${trip.city}?`)) return
     await supabase.from('trips').delete().eq('id', trip.id)
     if (trip.is_current) {
-      const homeCity = (profile as unknown as { home_city?: string }).home_city ?? ''
+      const homeCity = ownProfile?.home_city ?? ''
       await supabase.from('profiles').update({ current_city: homeCity }).eq('id', profile!.id)
+      refreshProfile()
     }
     setTrips(prev => prev.filter(t => t.id !== trip.id))
   }
