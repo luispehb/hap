@@ -3,8 +3,6 @@ import { useNavigate } from 'react-router-dom'
 import { OnboardingLayout } from './OnboardingLayout'
 import { Button } from '../../components/ui'
 import { onboardingStore } from '../../lib/onboardingStore'
-import { useAuth } from '../../contexts/AuthContext'
-import { supabase } from '../../lib/supabase'
 
 const MAX = 280
 const MIN_TO_CONTINUE = 50
@@ -25,7 +23,6 @@ const TRAVEL_FREQS = [
 
 export function Step3Question() {
   const navigate = useNavigate()
-  const { user } = useAuth()
   const [travelStyle, setTravelStyle] = useState('')
   const [travelFreq, setTravelFreq] = useState('')
   const [mindsetAnswer, setMindsetAnswer] = useState('')
