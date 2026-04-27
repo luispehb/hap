@@ -16,7 +16,7 @@ const ALL_INTERESTS = [
 ]
 
 const SOCIAL_PLATFORMS = [
-  { key: 'instagram', label: 'Instagram', placeholder: '@username' },
+  { key: 'instagram', label: 'Instagram', placeholder: '@username o username' },
   { key: 'linkedin', label: 'LinkedIn', placeholder: 'linkedin.com/in/you' },
   { key: 'whatsapp', label: 'WhatsApp', placeholder: '+1 234 567 8900' },
   { key: 'telegram', label: 'Telegram', placeholder: '@username' },

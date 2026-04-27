@@ -92,14 +92,15 @@ function formatTripDate(d: string): string {
 }
 
 function getSocialUrl(platform: string, handle: string): string {
+  const clean = handle.replace(/^@/, '')
   const map: Record<string, string> = {
-    instagram: `https://instagram.com/${handle}`,
-    linkedin: `https://linkedin.com/in/${handle}`,
-    whatsapp: `https://wa.me/${handle}`,
-    telegram: `https://t.me/${handle}`,
-    website: handle,
-    substack: `https://${handle}.substack.com`,
-    spotify: `https://open.spotify.com/user/${handle}`,
+    instagram: `https://instagram.com/${clean}`,
+    linkedin: `https://linkedin.com/in/${clean}`,
+    whatsapp: `https://wa.me/${handle.replace(/\s/g, '')}`,
+    telegram: `https://t.me/${clean}`,
+    website: handle.startsWith('http') ? handle : `https://${handle}`,
+    substack: `https://${clean}.substack.com`,
+    spotify: `https://open.spotify.com/user/${clean}`,
   }
   return map[platform] ?? handle
 }
