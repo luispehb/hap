@@ -446,9 +446,13 @@ export function Profile() {
     t.arrives_at <= todayForLabel && (!t.departs_at || t.departs_at >= todayForLabel)
   )
 
+  const pp = profile as unknown as { avatar_url?: string; banner_url?: string }
+  const resolvedAvatar = pp.avatar_url || getProfilePhoto(profile.display_name, profile.home_city)
+  const resolvedBanner = pp.banner_url || getBannerPhoto(profile.display_name, profile.home_city)
+
   const carouselPhotos = [
-    getProfilePhoto(profile.display_name, profile.home_city),
-    getBannerPhoto(profile.display_name, profile.home_city),
+    resolvedAvatar,
+    resolvedBanner,
     `https://picsum.photos/seed/${hashString(profile.id + 'c3')}/400/500`,
   ]
 
@@ -474,7 +478,7 @@ export function Profile() {
           </div>
           <div className="h-[130px] overflow-hidden">
             <img
-              src={getBannerPhoto(profile.display_name, profile.home_city)}
+              src={resolvedBanner}
               alt=""
               className="w-full h-full object-cover"
               onError={e => { e.currentTarget.style.display = 'none' }}
@@ -484,7 +488,7 @@ export function Profile() {
           <div className="absolute -bottom-8 left-4 z-10">
             <div className="w-20 h-20 rounded-2xl overflow-hidden" style={{ border: '3px solid white' }}>
               <img
-                src={getProfilePhoto(profile.display_name, profile.home_city)}
+                src={resolvedAvatar}
                 alt={profile.display_name}
                 className="w-full h-full object-cover"
                 onError={e => { e.currentTarget.style.display = 'none' }}

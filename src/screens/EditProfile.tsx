@@ -1,8 +1,9 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ChevronLeft, X, Plus, MapPin } from 'lucide-react'
+import { ChevronLeft, X, Plus, MapPin, Camera } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
+import { getProfilePhoto, getBannerPhoto } from '../lib/photos'
 
 const CITY_SUGGESTIONS = [
   'Ciudad de México', 'Barcelona', 'Lisboa', 'Bogotá', 'Buenos Aires',
@@ -98,9 +99,20 @@ export function EditProfile() {
   const navigate = useNavigate()
   const { profile, user, refreshProfile } = useAuth()
 
-  const p = profile as unknown as { first_name?: string; last_name?: string }
+  const p = profile as unknown as { first_name?: string; last_name?: string; avatar_url?: string; banner_url?: string }
   const [firstName, setFirstName] = useState(p?.first_name ?? '')
   const [lastName, setLastName] = useState(p?.last_name ?? '')
+
+  const [avatarPreview, setAvatarPreview] = useState<string>(
+    p?.avatar_url || getProfilePhoto(profile?.display_name ?? '', profile?.home_city ?? '')
+  )
+  const [bannerPreview, setBannerPreview] = useState<string>(
+    p?.banner_url || getBannerPhoto(profile?.display_name ?? '', profile?.home_city ?? '')
+  )
+  const [avatarFile, setAvatarFile] = useState<File | null>(null)
+  const [bannerFile, setBannerFile] = useState<File | null>(null)
+  const avatarInputRef = useRef<HTMLInputElement>(null)
+  const bannerInputRef = useRef<HTMLInputElement>(null)
   const [originCity, setOriginCity] = useState(profile?.home_city ?? '')
   const [isLocal, setIsLocal] = useState(profile?.is_local ?? false)
   const [localCity, setLocalCity] = useState(profile?.is_local ? (profile?.current_city ?? '') : '')
@@ -169,6 +181,26 @@ export function EditProfile() {
       social_links: socialLinks,
     }
 
+    if (avatarFile) {
+      const { data, error: upErr } = await supabase.storage
+        .from('avatars')
+        .upload(`${user.id}/avatar.jpg`, avatarFile, { upsert: true, contentType: avatarFile.type })
+      if (!upErr && data) {
+        const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(data.path)
+        updates.avatar_url = urlData.publicUrl
+      }
+    }
+
+    if (bannerFile) {
+      const { data, error: upErr } = await supabase.storage
+        .from('avatars')
+        .upload(`${user.id}/banner.jpg`, bannerFile, { upsert: true, contentType: bannerFile.type })
+      if (!upErr && data) {
+        const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(data.path)
+        updates.banner_url = urlData.publicUrl
+      }
+    }
+
     const { error } = await supabase
       .from('profiles')
       .update(updates)
@@ -214,6 +246,42 @@ export function EditProfile() {
               <p className="text-red-600 text-xs font-bold">{errorMsg}</p>
             </div>
           )}
+
+          {/* Photos */}
+          <div>
+            <SectionLabel>Fotos</SectionLabel>
+            <div className="relative">
+              {/* Banner */}
+              <div
+                className="w-full h-[110px] rounded-2xl overflow-hidden cursor-pointer relative group"
+                onClick={() => bannerInputRef.current?.click()}
+              >
+                <img src={bannerPreview} alt="" className="w-full h-full object-cover" />
+                <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 group-active:opacity-100 transition flex items-center justify-center gap-1.5">
+                  <Camera size={16} className="text-white" />
+                  <span className="text-white text-xs font-bold">Cambiar banner</span>
+                </div>
+              </div>
+              {/* Avatar */}
+              <div
+                className="absolute -bottom-7 left-4 cursor-pointer group"
+                onClick={() => avatarInputRef.current?.click()}
+              >
+                <div className="w-16 h-16 rounded-xl overflow-hidden relative" style={{ border: '3px solid white' }}>
+                  <img src={avatarPreview} alt="" className="w-full h-full object-cover" />
+                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 group-active:opacity-100 transition flex items-center justify-center">
+                    <Camera size={14} className="text-white" />
+                  </div>
+                </div>
+              </div>
+              {/* Hidden inputs */}
+              <input ref={bannerInputRef} type="file" accept="image/*" className="hidden"
+                onChange={e => { const f = e.target.files?.[0]; if (f) { setBannerFile(f); setBannerPreview(URL.createObjectURL(f)) } }} />
+              <input ref={avatarInputRef} type="file" accept="image/*" className="hidden"
+                onChange={e => { const f = e.target.files?.[0]; if (f) { setAvatarFile(f); setAvatarPreview(URL.createObjectURL(f)) } }} />
+            </div>
+            <p className="text-muted text-[10px] mt-10 ml-1">Toca el banner o la foto para cambiarlos</p>
+          </div>
 
           {/* Basic info */}
           <div>
