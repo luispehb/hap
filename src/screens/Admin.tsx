@@ -265,6 +265,12 @@ export function Admin() {
     setEditingUserId(null)
   }
 
+  const handleDeleteUser = async (profileId: string, authUserId: string, displayName: string) => {
+    if (!confirm(`¿Eliminar a ${displayName}? Esta acción no se puede deshacer.`)) return
+    await supabase.functions.invoke('delete-user', { body: { userId: authUserId } })
+    setAllUsers(prev => prev.filter(u => u.id !== profileId))
+  }
+
   const handleMindsetReject = async (profileId: string) => {
     await supabase.from('profiles')
       .update({ mindset_approved: false })
@@ -659,7 +665,7 @@ export function Admin() {
                                     <p style={{ fontSize: 13, fontWeight: 500, color: '#1A1A1A' }}>
                                       {(u.first_name && u.last_name) ? `${u.first_name} ${u.last_name}` : u.display_name}
                                     </p>
-                                    {email && <p style={{ fontSize: 12, color: '#B0AA9E', marginTop: 1 }}>{email}</p>}
+                                    {email && <p style={{ fontSize: 11, color: '#B0AA9E', marginTop: 1 }}>{email}</p>}
                                     {u.travel_style && <p style={{ fontSize: 11, color: '#B0AA9E', marginTop: 1 }}>{u.travel_style}</p>}
                                   </td>
                                   {/* Ciudad */}
@@ -713,9 +719,20 @@ export function Admin() {
                                         <button onClick={() => setEditingUserId(null)} className="cursor-pointer" style={{ fontSize: 12, fontWeight: 500, padding: '4px 12px', borderRadius: 6, background: 'transparent', color: '#B0AA9E', border: 'none' }}>Cancelar</button>
                                       </div>
                                     ) : (
-                                      <button onClick={() => { setEditingUserId(u.id); setEditValues({ trust_score: u.trust_score, current_city: u.current_city || '', mindset_approved: u.mindset_approved }) }} className="cursor-pointer" style={{ fontSize: 12, fontWeight: 500, padding: '4px 12px', borderRadius: 6, background: 'transparent', color: '#B0AA9E', border: '1px solid #E8E4DC' }}>
-                                        Editar
-                                      </button>
+                                      <div style={{ display: 'flex', gap: 8 }}>
+                                        <button onClick={() => { setEditingUserId(u.id); setEditValues({ trust_score: u.trust_score, current_city: u.current_city || '', mindset_approved: u.mindset_approved }) }} className="cursor-pointer" style={{ fontSize: 12, fontWeight: 500, padding: '4px 12px', borderRadius: 6, background: 'transparent', color: '#B0AA9E', border: '1px solid #E8E4DC' }}>
+                                          Editar
+                                        </button>
+                                        {u.user_id !== ADMIN_USER_ID && (
+                                          <button
+                                            onClick={() => handleDeleteUser(u.id, u.user_id, u.display_name)}
+                                            className="cursor-pointer transition-all hover:bg-[#FCEBEB]"
+                                            style={{ fontSize: 12, fontWeight: 500, padding: '4px 12px', borderRadius: 6, background: 'white', color: '#A32D2D', border: '1px solid #F09595' }}
+                                          >
+                                            Eliminar
+                                          </button>
+                                        )}
+                                      </div>
                                     )}
                                   </td>
                                 </tr>
