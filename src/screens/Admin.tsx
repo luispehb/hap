@@ -267,7 +267,13 @@ export function Admin() {
 
   const handleDeleteUser = async (profileId: string, authUserId: string, displayName: string) => {
     if (!confirm(`¿Eliminar a ${displayName}? Esta acción no se puede deshacer.`)) return
-    await supabase.functions.invoke('delete-user', { body: { userId: authUserId } })
+    const { error } = await supabase.functions.invoke('delete-user', {
+      body: { userId: authUserId }
+    })
+    if (error) {
+      alert('Error al eliminar usuario. Intenta de nuevo.')
+      return
+    }
     setAllUsers(prev => prev.filter(u => u.id !== profileId))
   }
 
