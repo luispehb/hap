@@ -26,6 +26,17 @@ const SOCIAL_EMOJIS: Record<string, string> = {
   spotify: '🎵',
 }
 
+interface Trip {
+  id: string
+  city: string
+  country: string | null
+  arrives_at: string
+  departs_at: string | null
+  is_current: boolean
+  is_home: boolean
+  notes: string | null
+}
+
 function randomCode(): string {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
   return Array.from({ length: 8 }, () => chars[Math.floor(Math.random() * chars.length)]).join('')
@@ -51,6 +62,10 @@ function formatTripDates(start: string | null, end: string | null): string {
   if (start && end) return `${fmt(start)} – ${fmt(end)}`
   if (end) return `Until ${fmt(end)}`
   return `Since ${fmt(start!)}`
+}
+
+function formatTripDate(d: string): string {
+  return new Date(d + 'T12:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })
 }
 
 function getSocialUrl(platform: string, handle: string): string {
@@ -144,6 +159,16 @@ export function Profile() {
   const [inviteCopied, setInviteCopied] = useState(false)
   const [generatingInvite, setGeneratingInvite] = useState(false)
 
+  const [trips, setTrips] = useState<Trip[]>([])
+  const [showTripModal, setShowTripModal] = useState(false)
+  const [tripCity, setTripCity] = useState('')
+  const [tripCountry, setTripCountry] = useState('')
+  const [tripArrivesAt, setTripArrivesAt] = useState('')
+  const [tripDepartsAt, setTripDepartsAt] = useState('')
+  const [tripIsCurrent, setTripIsCurrent] = useState(false)
+  const [tripNotes, setTripNotes] = useState('')
+  const [savingTrip, setSavingTrip] = useState(false)
+
   function showToast(msg: string) {
     setToast(msg)
     setTimeout(() => setToast(''), 2500)
@@ -183,6 +208,16 @@ export function Profile() {
       .or(inviterFilter)
       .then(({ count }) => setInviteCount(count || 0))
   }, [isOwnProfile, ownProfile?.id, user?.id])
+
+  useEffect(() => {
+    if (!profile?.id) return
+    supabase
+      .from('trips')
+      .select('*')
+      .eq('user_id', profile.id)
+      .order('arrives_at', { ascending: true })
+      .then(({ data }) => setTrips(data ?? []))
+  }, [profile?.id])
 
   const handleConnect = async () => {
     if (!ownProfile?.id || !id) return
@@ -253,6 +288,45 @@ export function Profile() {
     setTimeout(() => setInviteCopied(false), 2000)
   }
 
+  const handleAddTrip = async () => {
+    if (!profile?.id || !tripCity.trim() || !tripArrivesAt) return
+    setSavingTrip(true)
+    const { data } = await supabase
+      .from('trips')
+      .insert({
+        user_id: profile.id,
+        city: tripCity.trim(),
+        country: tripCountry.trim() || null,
+        arrives_at: tripArrivesAt,
+        departs_at: tripDepartsAt || null,
+        is_current: tripIsCurrent,
+        is_home: false,
+        notes: tripNotes.trim() || null,
+      })
+      .select()
+      .single()
+    if (tripIsCurrent) {
+      await supabase.from('profiles').update({ current_city: tripCity.trim() }).eq('id', profile.id)
+    }
+    if (data) {
+      setTrips(prev => [...prev, data].sort((a, b) => a.arrives_at.localeCompare(b.arrives_at)))
+    }
+    setTripCity(''); setTripCountry(''); setTripArrivesAt(''); setTripDepartsAt('')
+    setTripIsCurrent(false); setTripNotes('')
+    setShowTripModal(false)
+    setSavingTrip(false)
+  }
+
+  const handleDeleteTrip = async (trip: Trip) => {
+    if (!confirm(`¿Eliminar viaje a ${trip.city}?`)) return
+    await supabase.from('trips').delete().eq('id', trip.id)
+    if (trip.is_current) {
+      const homeCity = (profile as unknown as { home_city?: string }).home_city ?? ''
+      await supabase.from('profiles').update({ current_city: homeCity }).eq('id', profile!.id)
+    }
+    setTrips(prev => prev.filter(t => t.id !== trip.id))
+  }
+
   if (loading || !profile) {
     return (
       <div className="min-h-screen bg-cream flex items-center justify-center">
@@ -271,6 +345,10 @@ export function Profile() {
     getBannerPhoto(profile.display_name, profile.home_city),
     `https://picsum.photos/seed/${hashString(profile.id + 'c3')}/400/500`,
   ]
+
+  const today = new Date(); today.setHours(0, 0, 0, 0)
+  const hasFutureTripS = trips.some(t => t.is_current || new Date(t.arrives_at + 'T12:00:00') >= today)
+  const tripsSectionTitle = hasFutureTripS ? 'Próximos destinos' : 'Ciudades visitadas'
 
   return (
     <div className="min-h-screen bg-cream flex flex-col">
@@ -546,6 +624,83 @@ export function Profile() {
           </div>
         </div>
 
+        {/* Trips section */}
+        {trips.length > 0 && (
+          <div>
+            <p className="text-[10px] font-bold text-muted uppercase tracking-widest mb-2">
+              {tripsSectionTitle}
+            </p>
+            <div className="flex flex-col gap-2">
+              {trips.map(t => {
+                const arrives = new Date(t.arrives_at + 'T12:00:00')
+                let badgeLabel: string
+                let badgeColor: string
+                if (t.is_current) { badgeLabel = 'Aquí ahora'; badgeColor = '#4A90D9' }
+                else if (arrives >= today) { badgeLabel = 'Próximo'; badgeColor = '#E07A30' }
+                else { badgeLabel = 'Visitó'; badgeColor = '#B0AA9E' }
+
+                const dateStr = t.departs_at
+                  ? `${formatTripDate(t.arrives_at)} → ${formatTripDate(t.departs_at)}`
+                  : `${formatTripDate(t.arrives_at)} →`
+
+                return (
+                  <div
+                    key={t.id}
+                    className="bg-white border border-[#E8E4DC] rounded-xl px-4 py-3 flex items-center justify-between"
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <span className="text-lg flex-shrink-0">🏙</span>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <p className="text-ink text-sm font-bold">
+                            {t.city}{t.country ? `, ${t.country}` : ''}
+                          </p>
+                          <span
+                            className="text-[10px] font-semibold px-2 py-0.5 rounded-full flex-shrink-0"
+                            style={{ background: `${badgeColor}18`, color: badgeColor }}
+                          >
+                            {badgeLabel}
+                          </span>
+                        </div>
+                        <p className="text-muted text-xs mt-0.5">{dateStr}</p>
+                        {t.notes && (
+                          <p className="text-muted text-xs mt-0.5 italic">{t.notes}</p>
+                        )}
+                      </div>
+                    </div>
+                    {isOwnProfile && (
+                      <button
+                        onClick={() => handleDeleteTrip(t)}
+                        className="ml-3 flex-shrink-0 w-6 h-6 flex items-center justify-center rounded-full text-muted hover:text-red-400 hover:bg-red-50 transition cursor-pointer text-base leading-none"
+                      >
+                        ×
+                      </button>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+            {isOwnProfile && (
+              <button
+                onClick={() => setShowTripModal(true)}
+                className="w-full mt-2 border border-dashed border-[#E8E4DC] rounded-xl py-2.5 text-xs font-bold text-muted hover:bg-sand transition cursor-pointer"
+              >
+                + Agregar viaje
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* Add trip button when list is empty (own profile only) */}
+        {trips.length === 0 && isOwnProfile && (
+          <button
+            onClick={() => setShowTripModal(true)}
+            className="w-full border border-dashed border-[#E8E4DC] rounded-xl py-3 text-xs font-bold text-muted hover:bg-sand transition cursor-pointer"
+          >
+            + Agregar viaje
+          </button>
+        )}
+
         {/* Social links — own profile always visible */}
         {isOwnProfile && (
           <div>
@@ -689,6 +844,87 @@ export function Profile() {
           </>
         )
       }
+
+      {/* Add trip modal */}
+      {showTripModal && (
+        <div className="fixed inset-0 z-50 flex items-end">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setShowTripModal(false)} />
+          <div className="relative w-full max-w-[430px] mx-auto bg-white rounded-t-2xl px-5 pt-5 pb-10 z-10">
+            <div className="flex items-center justify-between mb-5">
+              <p className="text-ink font-bold text-base">Agregar viaje</p>
+              <button
+                onClick={() => setShowTripModal(false)}
+                className="text-muted text-2xl leading-none cursor-pointer hover:text-ink transition"
+              >
+                ×
+              </button>
+            </div>
+            <div className="flex flex-col gap-3">
+              <input
+                type="text"
+                value={tripCity}
+                onChange={e => setTripCity(e.target.value)}
+                placeholder="Ciudad *"
+                className="bg-sand border border-[#E8E4DC] rounded-xl px-4 py-3 text-sm text-ink placeholder:text-muted focus:outline-none focus:border-sky transition"
+              />
+              <input
+                type="text"
+                value={tripCountry}
+                onChange={e => setTripCountry(e.target.value)}
+                placeholder="País (opcional)"
+                className="bg-sand border border-[#E8E4DC] rounded-xl px-4 py-3 text-sm text-ink placeholder:text-muted focus:outline-none focus:border-sky transition"
+              />
+              <div className="flex gap-2">
+                <div className="flex-1">
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-muted pl-1 block mb-1">
+                    Llegada *
+                  </label>
+                  <input
+                    type="date"
+                    value={tripArrivesAt}
+                    onChange={e => setTripArrivesAt(e.target.value)}
+                    className="w-full bg-sand border border-[#E8E4DC] rounded-xl px-3 py-2.5 text-sm text-ink focus:outline-none focus:border-sky transition"
+                  />
+                </div>
+                <div className="flex-1">
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-muted pl-1 block mb-1">
+                    Salida
+                  </label>
+                  <input
+                    type="date"
+                    value={tripDepartsAt}
+                    onChange={e => setTripDepartsAt(e.target.value)}
+                    className="w-full bg-sand border border-[#E8E4DC] rounded-xl px-3 py-2.5 text-sm text-ink focus:outline-none focus:border-sky transition"
+                  />
+                </div>
+              </div>
+              <input
+                type="text"
+                value={tripNotes}
+                onChange={e => setTripNotes(e.target.value)}
+                placeholder="¿Algo que quieras compartir? (opcional)"
+                className="bg-sand border border-[#E8E4DC] rounded-xl px-4 py-3 text-sm text-ink placeholder:text-muted focus:outline-none focus:border-sky transition"
+              />
+              <label className="flex items-center gap-2.5 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={tripIsCurrent}
+                  onChange={e => setTripIsCurrent(e.target.checked)}
+                  className="w-4 h-4 rounded accent-sky cursor-pointer"
+                />
+                <span className="text-sm text-ink">Estoy aquí ahora</span>
+              </label>
+              <button
+                onClick={handleAddTrip}
+                disabled={!tripCity.trim() || !tripArrivesAt || savingTrip}
+                className="w-full bg-ink text-white rounded-xl py-3 text-sm font-bold disabled:opacity-40 active:opacity-80 transition cursor-pointer mt-1"
+              >
+                {savingTrip ? 'Guardando…' : 'Guardar viaje'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
