@@ -440,6 +440,11 @@ export function Profile() {
   const socialLinks = (profile as unknown as { social_links?: Record<string, string> }).social_links ?? {}
   const activeSocialPlatforms = Object.entries(socialLinks).filter(([, v]) => v)
 
+  const todayForLabel = new Date().toISOString().split('T')[0]
+  const activeTripForLabel = trips.find(t =>
+    t.arrives_at <= todayForLabel && (!t.departs_at || t.departs_at >= todayForLabel)
+  )
+
   const carouselPhotos = [
     getProfilePhoto(profile.display_name, profile.home_city),
     getBannerPhoto(profile.display_name, profile.home_city),
@@ -556,7 +561,11 @@ export function Profile() {
       {isOwnProfile && (
         <div className="pt-12 px-4 pb-2">
           <p className="text-ink font-extrabold text-xl tracking-tight">{profile.display_name}</p>
-          <p className="text-muted text-xs mt-0.5">{profile.home_city} · {profile.is_local ? 'Local' : 'Traveler'}</p>
+          <p className="text-muted text-xs mt-0.5">
+            {activeTripForLabel
+              ? `${activeTripForLabel.city} · traveler`
+              : `${profile.home_city} · ${profile.is_local ? 'local' : 'traveler'}`}
+          </p>
         </div>
       )}
 
@@ -672,7 +681,9 @@ export function Profile() {
           {profile.is_local ? (
             <div>
               <p className="text-[#C05A20] font-extrabold text-base">{profile.current_city}</p>
-              <p className="text-[#D09060] text-[10px] mt-1">Local · resident</p>
+              <p className="text-[#D09060] text-[10px] mt-1">
+                {activeTripForLabel ? `${activeTripForLabel.city} · traveler` : 'Local · resident'}
+              </p>
             </div>
           ) : (
             <div>
