@@ -204,7 +204,7 @@ export function Admin() {
   const filters: ActiveFilter[] = ['todos', 'approve', 'review', 'doubt']
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'row' }}>
+    <div style={{ display: 'flex', minHeight: '100vh', width: '100%', background: '#EAE6DF' }}>
 
       {/* ── Sidebar ── */}
       <aside
