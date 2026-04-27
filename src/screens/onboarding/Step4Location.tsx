@@ -63,6 +63,8 @@ export function Step4Location() {
           travel_style: stored.travel_style ?? '',
           travel_frequency: stored.travel_frequency ?? '',
           linkedin_url: stored.linkedin_url ?? '',
+          first_name: stored.first_name ?? '',
+          last_name: stored.last_name ?? '',
           has_invite: !!pendingInviteCodeEarly,
           trust_score: stored.trust_score ?? 50,
           is_verified: false,

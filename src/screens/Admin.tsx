@@ -36,6 +36,8 @@ interface UserProfile {
   id: string
   user_id: string
   display_name: string
+  first_name: string | null
+  last_name: string | null
   current_city: string
   trust_score: number
   has_invite: boolean
@@ -193,7 +195,7 @@ export function Admin() {
         .select('id', { count: 'exact', head: true }),
       supabase
         .from('profiles')
-        .select('id, user_id, display_name, current_city, trust_score, has_invite, mindset_approved, created_at, travel_style, email')
+        .select('id, user_id, display_name, first_name, last_name, current_city, trust_score, has_invite, mindset_approved, created_at, travel_style, email')
         .order('created_at', { ascending: false }),
       supabase
         .from('invitations')
@@ -654,7 +656,9 @@ export function Admin() {
                                   </td>
                                   {/* Nombre + email */}
                                   <td style={{ padding: '10px 16px' }}>
-                                    <p style={{ fontSize: 13, fontWeight: 500, color: '#1A1A1A' }}>{u.display_name}</p>
+                                    <p style={{ fontSize: 13, fontWeight: 500, color: '#1A1A1A' }}>
+                                      {(u.first_name && u.last_name) ? `${u.first_name} ${u.last_name}` : u.display_name}
+                                    </p>
                                     {email && <p style={{ fontSize: 12, color: '#B0AA9E', marginTop: 1 }}>{email}</p>}
                                     {u.travel_style && <p style={{ fontSize: 11, color: '#B0AA9E', marginTop: 1 }}>{u.travel_style}</p>}
                                   </td>

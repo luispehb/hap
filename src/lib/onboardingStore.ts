@@ -1,5 +1,8 @@
 interface OnboardingStore {
+  first_name: string
+  last_name: string
   display_name: string
+  photo_url: string
   origin_city: string
   current_city: string
   is_local: boolean

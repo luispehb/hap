@@ -5,30 +5,67 @@ import { OnboardingLayout } from './OnboardingLayout'
 import { Button } from '../../components/ui'
 import { useAuth } from '../../contexts/AuthContext'
 import { onboardingStore } from '../../lib/onboardingStore'
+import { supabase } from '../../lib/supabase'
 
 export function Step1Identity() {
   const navigate = useNavigate()
   const { user } = useAuth()
-  const [name, setName] = useState('')
+  const [firstName, setFirstName] = useState('')
+  const [lastName, setLastName] = useState('')
   const [city, setCity] = useState('')
   const [photoUrl, setPhotoUrl] = useState<string | null>(null)
+  const [photoFile, setPhotoFile] = useState<File | null>(null)
+  const [uploading, setUploading] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  // Pre-fill name from Google if available
   useEffect(() => {
     const fullName: string = user?.user_metadata?.full_name ?? ''
-    if (fullName) setName(fullName.split(' ')[0])
+    if (fullName) {
+      const parts = fullName.trim().split(' ')
+      setFirstName(parts[0] ?? '')
+      setLastName(parts.slice(1).join(' ') ?? '')
+    }
   }, [user])
 
   function handlePhotoChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
-    if (file) setPhotoUrl(URL.createObjectURL(file))
+    if (file) {
+      setPhotoFile(file)
+      setPhotoUrl(URL.createObjectURL(file))
+    }
   }
 
-  function handleContinue() {
-    onboardingStore.set({ display_name: name.trim(), origin_city: city.trim() })
+  async function handleContinue() {
+    if (!firstName.trim() || !lastName.trim()) return
+    setUploading(true)
+
+    const display_name = `${firstName.trim()} ${lastName.trim().charAt(0).toUpperCase()}.`
+
+    let photo_url: string | undefined
+    if (photoFile && user) {
+      const { data, error } = await supabase.storage
+        .from('avatars')
+        .upload(`${user.id}/avatar.jpg`, photoFile, { upsert: true, contentType: photoFile.type })
+
+      if (!error && data) {
+        const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(data.path)
+        photo_url = urlData.publicUrl
+      }
+    }
+
+    onboardingStore.set({
+      first_name: firstName.trim(),
+      last_name: lastName.trim(),
+      display_name,
+      origin_city: city.trim(),
+      ...(photo_url ? { photo_url } : {}),
+    })
+
+    setUploading(false)
     navigate('/onboarding/2')
   }
+
+  const canContinue = firstName.trim().length > 0 && lastName.trim().length > 0
 
   return (
     <OnboardingLayout step={1}>
@@ -38,7 +75,9 @@ export function Step1Identity() {
       <h1 className="text-[26px] font-extrabold text-ink tracking-tight leading-tight mb-1">
         What's your name?
       </h1>
-      <p className="text-muted text-sm mb-8">Just your first name. No pressure.</p>
+      <p className="text-muted text-sm mb-8">
+        First and last name. Stays private — only you see the full version.
+      </p>
 
       {/* Photo upload */}
       <div className="mx-auto mb-6" onClick={() => fileInputRef.current?.click()}>
@@ -66,13 +105,22 @@ export function Step1Identity() {
 
       {/* Input fields */}
       <div className="flex flex-col gap-3">
-        <input
-          type="text"
-          value={name}
-          onChange={e => setName(e.target.value)}
-          placeholder="Your name"
-          className="bg-white border border-[#E8E4DC] rounded-xl px-4 py-3 text-sm text-ink placeholder:text-muted focus:outline-none focus:border-sky transition"
-        />
+        <div className="flex gap-3">
+          <input
+            type="text"
+            value={firstName}
+            onChange={e => setFirstName(e.target.value)}
+            placeholder="First name"
+            className="flex-1 bg-white border border-[#E8E4DC] rounded-xl px-4 py-3 text-sm text-ink placeholder:text-muted focus:outline-none focus:border-sky transition"
+          />
+          <input
+            type="text"
+            value={lastName}
+            onChange={e => setLastName(e.target.value)}
+            placeholder="Last name"
+            className="flex-1 bg-white border border-[#E8E4DC] rounded-xl px-4 py-3 text-sm text-ink placeholder:text-muted focus:outline-none focus:border-sky transition"
+          />
+        </div>
         <input
           type="text"
           value={city}
@@ -82,14 +130,23 @@ export function Step1Identity() {
         />
       </div>
 
+      {firstName.trim() && lastName.trim() && (
+        <p className="text-muted text-xs text-center mt-3">
+          You'll appear as{' '}
+          <span className="text-ink font-bold">
+            {firstName.trim()} {lastName.trim().charAt(0).toUpperCase()}.
+          </span>
+        </p>
+      )}
+
       <div className="mt-auto pt-8">
         <Button
           variant="primary"
           fullWidth
-          disabled={name.trim().length === 0}
+          disabled={!canContinue || uploading}
           onClick={handleContinue}
         >
-          Continue →
+          {uploading ? 'Saving…' : 'Continue →'}
         </Button>
       </div>
     </OnboardingLayout>
