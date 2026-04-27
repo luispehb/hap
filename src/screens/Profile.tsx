@@ -251,7 +251,9 @@ export function Profile() {
         const activeTrip = loadedTrips.find(t =>
           t.arrives_at <= todayStr && (!t.departs_at || t.departs_at >= todayStr)
         )
-        const correctCity = activeTrip?.city ?? (ownProfile?.home_city ?? '')
+        const op = ownProfile as unknown as Record<string, string>
+        const homeCity = op.home_city || op.origin_city || ''
+        const correctCity = activeTrip?.city ?? homeCity
 
         // Sync current_city if it drifted (trip started or ended)
         if (correctCity && correctCity !== profile.current_city) {
@@ -401,12 +403,28 @@ export function Profile() {
   const handleDeleteTrip = async (trip: Trip) => {
     if (!confirm(`¿Eliminar viaje a ${trip.city}?`)) return
     await supabase.from('trips').delete().eq('id', trip.id)
-    if (trip.is_current) {
-      const homeCity = ownProfile?.home_city ?? ''
-      await supabase.from('profiles').update({ current_city: homeCity }).eq('id', profile!.id)
-      refreshProfile()
+
+    const remaining = trips.filter(t => t.id !== trip.id)
+    setTrips(remaining)
+
+    if (isOwnProfile) {
+      const todayStr = new Date().toISOString().split('T')[0]
+      const wasActive = trip.arrives_at <= todayStr && (!trip.departs_at || trip.departs_at >= todayStr)
+
+      if (wasActive || trip.is_current) {
+        // Find another active trip, or fall back to home_city
+        const nextActive = remaining.find(t =>
+          t.arrives_at <= todayStr && (!t.departs_at || t.departs_at >= todayStr)
+        )
+        const p = ownProfile as unknown as Record<string, string>
+        const homeCity = p.home_city || p.origin_city || ''
+        const revertTo = nextActive?.city ?? homeCity
+        if (revertTo) {
+          await supabase.from('profiles').update({ current_city: revertTo }).eq('id', profile!.id)
+        }
+        refreshProfile()
+      }
     }
-    setTrips(prev => prev.filter(t => t.id !== trip.id))
   }
 
   if (loading || !profile) {
