@@ -267,8 +267,8 @@ export function Profile() {
   const activeSocialPlatforms = Object.entries(socialLinks).filter(([, v]) => v)
 
   const carouselPhotos = [
-    getProfilePhoto(profile.display_name, profile.origin_city),
-    getBannerPhoto(profile.display_name, profile.origin_city),
+    getProfilePhoto(profile.display_name, profile.home_city),
+    getBannerPhoto(profile.display_name, profile.home_city),
     `https://picsum.photos/seed/${hashString(profile.id + 'c3')}/400/500`,
   ]
 
@@ -294,7 +294,7 @@ export function Profile() {
           </div>
           <div className="h-[130px] overflow-hidden">
             <img
-              src={getBannerPhoto(profile.display_name, profile.origin_city)}
+              src={getBannerPhoto(profile.display_name, profile.home_city)}
               alt=""
               className="w-full h-full object-cover"
               onError={e => { e.currentTarget.style.display = 'none' }}
@@ -304,7 +304,7 @@ export function Profile() {
           <div className="absolute -bottom-8 left-4 z-10">
             <div className="w-20 h-20 rounded-2xl overflow-hidden" style={{ border: '3px solid white' }}>
               <img
-                src={getProfilePhoto(profile.display_name, profile.origin_city)}
+                src={getProfilePhoto(profile.display_name, profile.home_city)}
                 alt={profile.display_name}
                 className="w-full h-full object-cover"
                 onError={e => { e.currentTarget.style.display = 'none' }}
@@ -369,7 +369,7 @@ export function Profile() {
                   {profile.display_name}
                 </p>
                 <p className="text-white/70 text-xs mt-0.5">
-                  {profile.origin_city} · {daysLabel}
+                  {profile.home_city} · {daysLabel}
                 </p>
               </div>
               <TrustBadge score={profile.trust_score} />
@@ -382,7 +382,7 @@ export function Profile() {
       {isOwnProfile && (
         <div className="pt-12 px-4 pb-2">
           <p className="text-ink font-extrabold text-xl tracking-tight">{profile.display_name}</p>
-          <p className="text-muted text-xs mt-0.5">{profile.origin_city} · {profile.is_local ? 'Local' : 'Traveler'}</p>
+          <p className="text-muted text-xs mt-0.5">{profile.home_city} · {profile.is_local ? 'Local' : 'Traveler'}</p>
         </div>
       )}
 
@@ -509,7 +509,7 @@ export function Profile() {
                 )}
               </div>
               <p className="text-[#D09060] text-[10px] mt-1">
-                Traveler from {profile.origin_city} · {daysLabel}
+                Traveler from {profile.home_city} · {daysLabel}
               </p>
             </div>
           )}

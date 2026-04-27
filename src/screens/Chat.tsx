@@ -13,7 +13,7 @@ interface Message {
   sent_at: string
   sender?: {
     display_name: string
-    origin_city: string
+    home_city: string
   }
 }
 
@@ -60,7 +60,7 @@ export function Chat() {
     if (!planId) return
     const { data } = await supabase
       .from('messages')
-      .select('*, sender:profiles(display_name, origin_city)')
+      .select('*, sender:profiles(display_name, home_city)')
       .eq('plan_id', planId)
       .order('sent_at', { ascending: true })
     setMessages(data ?? [])

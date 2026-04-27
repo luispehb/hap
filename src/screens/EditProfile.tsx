@@ -99,7 +99,7 @@ export function EditProfile() {
   const { profile, user, refreshProfile } = useAuth()
 
   const [displayName, setDisplayName] = useState(profile?.display_name ?? '')
-  const [originCity, setOriginCity] = useState(profile?.origin_city ?? '')
+  const [originCity, setOriginCity] = useState(profile?.home_city ?? '')
   const [isLocal, setIsLocal] = useState(profile?.is_local ?? false)
   const [localCity, setLocalCity] = useState(profile?.is_local ? (profile?.current_city ?? '') : '')
   const [bioQuestion, setBioQuestion] = useState(profile?.bio_question ?? '')
@@ -149,7 +149,7 @@ export function EditProfile() {
     const firstTrip = trips[0] ?? null
     const updates: Record<string, unknown> = {
       display_name: displayName.trim() || profile.display_name,
-      origin_city: originCity,
+      home_city: originCity,
       is_local: isLocal,
       current_city: isLocal ? localCity : (firstTrip?.city ?? profile.current_city),
       trip_start_date: isLocal ? null : (firstTrip?.arrival || null),

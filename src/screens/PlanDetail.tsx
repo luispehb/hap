@@ -183,7 +183,7 @@ export function PlanDetail() {
               Proposed by
             </p>
             <div className="bg-white border border-[#E8E4DC] rounded-2xl p-3 flex items-center gap-3">
-              <Avatar name={plan.creator.display_name} city={plan.creator.origin_city} size="md" />
+              <Avatar name={plan.creator.display_name} city={plan.creator.home_city} size="md" />
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-1.5">
                   <span className="text-sm font-bold text-ink truncate">
@@ -193,7 +193,7 @@ export function PlanDetail() {
                     <span className="w-1.5 h-1.5 rounded-full bg-green-400 flex-shrink-0" />
                   )}
                 </div>
-                <p className="text-[11px] text-muted">{plan.creator.origin_city}</p>
+                <p className="text-[11px] text-muted">{plan.creator.home_city}</p>
               </div>
               <TrustBadge score={plan.creator.trust_score} />
             </div>
@@ -224,7 +224,7 @@ export function PlanDetail() {
                   <Avatar
                     key={p.id}
                     name={p.profile.display_name}
-                    city={p.profile.origin_city}
+                    city={p.profile.home_city}
                     size="sm"
                   />
                 )

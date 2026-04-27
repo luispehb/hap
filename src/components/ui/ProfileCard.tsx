@@ -6,7 +6,7 @@ import { getProfilePhoto, getBannerPhoto } from '../../lib/photos'
 
 interface Profile {
   display_name: string
-  origin_city: string
+  home_city: string
   current_city: string
   trip_end_date: string | null
   is_local: boolean
@@ -70,7 +70,7 @@ export function ProfileCard({
         {/* Banner — 110px */}
         <div className="h-[110px] w-full overflow-hidden rounded-t-[20px] relative">
           <img
-            src={getBannerPhoto(profile.display_name, profile.origin_city)}
+            src={getBannerPhoto(profile.display_name, profile.home_city)}
             alt=""
             className="w-full h-full object-cover"
             onError={e => { e.currentTarget.style.display = 'none' }}
@@ -87,7 +87,7 @@ export function ProfileCard({
         <div className="absolute -bottom-5 left-4 z-10">
           <div className="w-14 h-14 rounded-2xl overflow-hidden" style={{ border: '3px solid white' }}>
             <img
-              src={getProfilePhoto(profile.display_name, profile.origin_city)}
+              src={getProfilePhoto(profile.display_name, profile.home_city)}
               alt={profile.display_name}
               className="w-full h-full object-cover"
               onError={e => { e.currentTarget.style.display = 'none' }}
@@ -119,7 +119,7 @@ export function ProfileCard({
         <div className="mb-2">
           <p className="text-ink font-extrabold text-base tracking-tight">{profile.display_name}</p>
           <p className="text-muted text-xs mt-0.5">
-            {profile.origin_city}{daysLabel ? ` · ${daysLabel}` : ''}
+            {profile.home_city}{daysLabel ? ` · ${daysLabel}` : ''}
           </p>
         </div>
 

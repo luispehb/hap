@@ -17,7 +17,7 @@ interface Connection {
 interface ProfileRow {
   id: string
   display_name: string
-  origin_city: string
+  home_city: string
   current_city: string
   is_local: boolean
   social_links: Record<string, string>
@@ -86,7 +86,7 @@ export function Connections() {
 
         const { data: profileData, error: profileError } = await supabase
           .from('profiles')
-          .select('id, display_name, origin_city, current_city, is_local, social_links, trust_score')
+          .select('id, display_name, home_city, current_city, is_local, social_links, trust_score')
           .in('id', otherIds)
 
         if (profileError) throw profileError
@@ -178,7 +178,7 @@ export function Connections() {
                     <div className="flex items-center gap-3 mb-3">
                       <div className="w-12 h-12 rounded-xl overflow-hidden flex-shrink-0">
                         <img
-                          src={getProfilePhoto(other.display_name, other.origin_city)}
+                          src={getProfilePhoto(other.display_name, other.home_city)}
                           alt={other.display_name}
                           className="w-full h-full object-cover"
                           onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none' }}
@@ -186,7 +186,7 @@ export function Connections() {
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-ink font-bold text-sm">{other.display_name}</p>
-                        <p className="text-muted text-xs">{other.origin_city} · {other.is_local ? 'Local' : other.current_city}</p>
+                        <p className="text-muted text-xs">{other.home_city} · {other.is_local ? 'Local' : other.current_city}</p>
                       </div>
                     </div>
                     <div className="flex gap-2">
@@ -224,7 +224,7 @@ export function Connections() {
                     >
                       <div className="w-12 h-12 rounded-xl overflow-hidden flex-shrink-0">
                         <img
-                          src={getProfilePhoto(other.display_name, other.origin_city)}
+                          src={getProfilePhoto(other.display_name, other.home_city)}
                           alt={other.display_name}
                           className="w-full h-full object-cover"
                           onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none' }}
@@ -232,7 +232,7 @@ export function Connections() {
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-ink font-bold text-sm">{other.display_name}</p>
-                        <p className="text-muted text-xs">{other.origin_city} · {other.is_local ? 'Local' : other.current_city}</p>
+                        <p className="text-muted text-xs">{other.home_city} · {other.is_local ? 'Local' : other.current_city}</p>
                       </div>
                     </div>
                     <button

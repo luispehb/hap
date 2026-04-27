@@ -17,7 +17,7 @@ interface Message {
 interface OtherProfile {
   id: string
   display_name: string
-  origin_city: string
+  home_city: string
 }
 
 export function DirectChat() {
@@ -34,7 +34,7 @@ export function DirectChat() {
     if (!profileId) return
     supabase
       .from('profiles')
-      .select('id, display_name, origin_city')
+      .select('id, display_name, home_city')
       .eq('id', profileId)
       .maybeSingle()
       .then(({ data }) => setOtherProfile(data))
@@ -121,7 +121,7 @@ export function DirectChat() {
           <>
             <div className="w-9 h-9 rounded-xl overflow-hidden flex-shrink-0">
               <img
-                src={getProfilePhoto(otherProfile.display_name, otherProfile.origin_city)}
+                src={getProfilePhoto(otherProfile.display_name, otherProfile.home_city)}
                 alt={otherProfile.display_name}
                 className="w-full h-full object-cover"
                 onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none' }}
@@ -129,7 +129,7 @@ export function DirectChat() {
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-ink font-bold text-sm">{otherProfile.display_name}</p>
-              <p className="text-muted text-xs">{otherProfile.origin_city}</p>
+              <p className="text-muted text-xs">{otherProfile.home_city}</p>
             </div>
           </>
         )}

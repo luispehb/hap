@@ -26,7 +26,7 @@ interface PlanInvite {
 interface ProfileRow {
   id: string
   display_name: string
-  origin_city: string
+  home_city: string
   current_city: string
   is_local: boolean
   trust_score: number
@@ -85,7 +85,7 @@ export function Notifications() {
           const ids = reqs.map((r: ConnectionRequest) => r.user_a_id)
           const { data: profileData, error: profileError } = await supabase
             .from('profiles')
-            .select('id, display_name, origin_city, current_city, is_local, trust_score')
+            .select('id, display_name, home_city, current_city, is_local, trust_score')
             .in('id', ids)
 
           if (profileError) throw profileError
@@ -217,7 +217,7 @@ export function Notifications() {
                     >
                       <div className="w-12 h-12 rounded-xl overflow-hidden flex-shrink-0">
                         <img
-                          src={getProfilePhoto(other.display_name, other.origin_city)}
+                          src={getProfilePhoto(other.display_name, other.home_city)}
                           alt={other.display_name}
                           className="w-full h-full object-cover"
                           onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none' }}
@@ -226,7 +226,7 @@ export function Notifications() {
                       <div className="flex-1 min-w-0">
                         <p className="text-ink font-bold text-sm">{other.display_name}</p>
                         <p className="text-muted text-xs">
-                          {other.origin_city} · {other.is_local ? 'Local' : other.current_city}
+                          {other.home_city} · {other.is_local ? 'Local' : other.current_city}
                         </p>
                         <p className="text-muted text-[10px] mt-0.5">
                           {timeAgo(req.connected_at ?? req.created_at ?? new Date().toISOString())}

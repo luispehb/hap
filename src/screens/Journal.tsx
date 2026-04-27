@@ -10,7 +10,7 @@ import { formatPlanTime } from '../lib/utils'
 import type { Plan } from '../hooks/usePlans'
 
 interface JournalPlan extends Plan {
-  participants?: { profile: { display_name: string; origin_city: string } | null }[]
+  participants?: { profile: { display_name: string; home_city: string } | null }[]
 }
 
 export function Journal() {
@@ -57,14 +57,14 @@ export function Journal() {
         if (visiblePlans.length > 0) {
           const { data: participantRows, error: participantsError } = await supabase
             .from('plan_participants')
-            .select('plan_id, profile:profiles(display_name, origin_city)')
+            .select('plan_id, profile:profiles(display_name, home_city)')
             .in('plan_id', visiblePlans.map(plan => plan.id))
 
           if (!participantsError && participantRows) {
             const participantsByPlan = new Map<string, JournalPlan['participants']>()
             const rows = participantRows as unknown as {
               plan_id: string
-              profile: { display_name: string; origin_city: string } | { display_name: string; origin_city: string }[] | null
+              profile: { display_name: string; home_city: string } | { display_name: string; home_city: string }[] | null
             }[]
 
             for (const row of rows) {
@@ -133,7 +133,7 @@ export function Journal() {
           plans.map(plan => {
             const participants = (plan.participants ?? [])
               .map(p => p.profile)
-              .filter(Boolean) as { display_name: string; origin_city: string }[]
+              .filter(Boolean) as { display_name: string; home_city: string }[]
 
             return (
               <button
@@ -180,7 +180,7 @@ export function Journal() {
                       <div className="flex -space-x-1">
                         {participants.slice(0, 4).map((p, i) => (
                           <div key={i} className="ring-2 ring-white rounded-[8px]">
-                            <Avatar name={p.display_name} city={p.origin_city} size="sm" />
+                            <Avatar name={p.display_name} city={p.home_city} size="sm" />
                           </div>
                         ))}
                       </div>

@@ -19,7 +19,7 @@ interface PlanRow {
 interface DirectThread {
   profileId: string
   display_name: string
-  origin_city: string
+  home_city: string
   lastMessage: string
   lastAt: string
 }
@@ -65,7 +65,7 @@ export function Chats() {
 
         const { data: profileData } = await supabase
           .from('profiles')
-          .select('id, display_name, origin_city')
+          .select('id, display_name, home_city')
           .in('id', otherIds)
 
         // Get last message for each thread
@@ -83,7 +83,7 @@ export function Chats() {
           threads.push({
             profileId: other.id,
             display_name: other.display_name,
-            origin_city: other.origin_city,
+            home_city: other.home_city,
             lastMessage: msgs?.[0]?.content ?? 'Start a conversation',
             lastAt: msgs?.[0]?.created_at ?? '',
           })
@@ -166,7 +166,7 @@ export function Chats() {
                     >
                       <div className="w-11 h-11 rounded-xl overflow-hidden flex-shrink-0">
                         <img
-                          src={getProfilePhoto(thread.display_name, thread.origin_city)}
+                          src={getProfilePhoto(thread.display_name, thread.home_city)}
                           alt={thread.display_name}
                           className="w-full h-full object-cover"
                           onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none' }}

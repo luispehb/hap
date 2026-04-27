@@ -52,7 +52,7 @@ export function Step4Location() {
         .upsert({
           user_id: user.id,
           display_name: stored.display_name || user.user_metadata?.full_name?.split(' ')[0] || user.email?.split('@')[0] || 'Traveler',
-          origin_city: stored.origin_city || '',
+          home_city: stored.home_city || '',
           current_city: selectedCity,
           is_local: mode === 'local',
           trip_start_date: mode === 'local' ? null : (arrival || null),

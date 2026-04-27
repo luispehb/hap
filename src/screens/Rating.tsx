@@ -47,10 +47,10 @@ function ConnectionReveal({ profile, onContinue }: ConnectionRevealProps) {
         </div>
 
         <div className="mx-4 mb-4 bg-white border border-[#E8E4DC] rounded-2xl p-4 flex items-center gap-3">
-          <Avatar name={profile.display_name} city={profile.origin_city} size="md" />
+          <Avatar name={profile.display_name} city={profile.home_city} size="md" />
           <div>
             <p className="text-ink font-bold text-sm">{profile.display_name}</p>
-            <p className="text-muted text-xs">{profile.origin_city}</p>
+            <p className="text-muted text-xs">{profile.home_city}</p>
           </div>
         </div>
 
@@ -104,10 +104,10 @@ function ParticipantCard({ profile, rating, onChange }: ParticipantCardProps) {
     <div className="bg-white border border-[#E8E4DC] rounded-2xl p-4 mb-3">
       {/* Profile row */}
       <div className="flex items-center gap-3 mb-4">
-        <Avatar name={profile.display_name} city={profile.origin_city} size="md" />
+        <Avatar name={profile.display_name} city={profile.home_city} size="md" />
         <div>
           <p className="text-ink font-bold text-sm">{profile.display_name}</p>
-          <p className="text-muted text-xs">{profile.origin_city}</p>
+          <p className="text-muted text-xs">{profile.home_city}</p>
         </div>
       </div>
 

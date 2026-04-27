@@ -57,7 +57,7 @@ export function Step1Identity() {
       first_name: firstName.trim(),
       last_name: lastName.trim(),
       display_name,
-      origin_city: city.trim(),
+      home_city: city.trim(),
       ...(photo_url ? { photo_url } : {}),
     })
 

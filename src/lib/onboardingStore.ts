@@ -3,7 +3,7 @@ interface OnboardingStore {
   last_name: string
   display_name: string
   photo_url: string
-  origin_city: string
+  home_city: string
   current_city: string
   is_local: boolean
   trip_start_date: string | null

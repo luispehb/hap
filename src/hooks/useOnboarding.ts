@@ -2,7 +2,7 @@ import { supabase } from '../lib/supabase'
 
 export interface OnboardingData {
   display_name: string
-  origin_city: string
+  home_city: string
   current_city: string
   is_local: boolean
   trip_start_date: string | null
@@ -27,7 +27,7 @@ export async function saveProfile(
       .from('profiles')
       .update({
         display_name: data.display_name,
-        origin_city: data.origin_city,
+        home_city: data.home_city,
         current_city: data.current_city,
         is_local: data.is_local,
         trip_start_date: data.trip_start_date,
@@ -43,7 +43,7 @@ export async function saveProfile(
       .insert({
         user_id: userId,
         display_name: data.display_name,
-        origin_city: data.origin_city,
+        home_city: data.home_city,
         current_city: data.current_city,
         is_local: data.is_local,
         trip_start_date: data.trip_start_date,
