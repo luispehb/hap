@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
@@ -30,8 +30,11 @@ interface MindsetProfile {
   mindset_recommendation: string | null
 }
 
+type SortColumn = 'name' | 'city' | 'trust' | 'invite' | 'status' | 'date'
+
 interface UserProfile {
   id: string
+  user_id: string
   display_name: string
   current_city: string
   trust_score: number
@@ -160,6 +163,10 @@ export function Admin() {
   const [inviteCodes, setInviteCodes] = useState<InviteCode[]>([])
   const [newCodeId, setNewCodeId] = useState<string | null>(null)
   const [copiedCode, setCopiedCode] = useState<string | null>(null)
+  const [emailMap, setEmailMap] = useState<Record<string, string>>({})
+  const [sortColumn, setSortColumn] = useState<SortColumn>('date')
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
+  const [searchQuery, setSearchQuery] = useState('')
   const [loading, setLoading] = useState(true)
   const [activeSection, setActiveSection] = useState<ActiveSection>('mindset')
   const [activeFilter, setActiveFilter] = useState<ActiveFilter>('todos')
@@ -186,7 +193,7 @@ export function Admin() {
         .select('id', { count: 'exact', head: true }),
       supabase
         .from('profiles')
-        .select('id, display_name, current_city, trust_score, has_invite, mindset_approved, created_at, travel_style, email')
+        .select('id, user_id, display_name, current_city, trust_score, has_invite, mindset_approved, created_at, travel_style, email')
         .order('created_at', { ascending: false }),
       supabase
         .from('invitations')
@@ -199,6 +206,9 @@ export function Admin() {
       setAllUsers(res4.data ?? [])
       setInviteCodes(res5.data ?? [])
       setLoading(false)
+      supabase.functions.invoke('get-users-admin').then(({ data }) => {
+        if (data?.emails) setEmailMap(data.emails)
+      })
     })
   }, [isAdmin])
 
@@ -266,6 +276,39 @@ export function Admin() {
         <p className="text-ink font-bold">Access denied</p>
       </div>
     )
+  }
+
+  const processedUsers = useMemo(() => {
+    let list = [...allUsers]
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase()
+      list = list.filter(u =>
+        u.display_name.toLowerCase().includes(q) ||
+        (u.current_city ?? '').toLowerCase().includes(q) ||
+        (emailMap[u.user_id] ?? u.email ?? '').toLowerCase().includes(q)
+      )
+    }
+    list.sort((a, b) => {
+      let va: string | number, vb: string | number
+      switch (sortColumn) {
+        case 'name':   va = a.display_name.toLowerCase();   vb = b.display_name.toLowerCase();   break
+        case 'city':   va = (a.current_city ?? '').toLowerCase(); vb = (b.current_city ?? '').toLowerCase(); break
+        case 'trust':  va = a.trust_score;  vb = b.trust_score;  break
+        case 'invite': va = a.has_invite ? 1 : 0; vb = b.has_invite ? 1 : 0; break
+        case 'status': va = a.mindset_approved === true ? 2 : a.mindset_approved === false ? 0 : 1
+                       vb = b.mindset_approved === true ? 2 : b.mindset_approved === false ? 0 : 1; break
+        default:       va = a.created_at; vb = b.created_at
+      }
+      if (va < vb) return sortDir === 'asc' ? -1 : 1
+      if (va > vb) return sortDir === 'asc' ? 1 : -1
+      return 0
+    })
+    return list
+  }, [allUsers, emailMap, searchQuery, sortColumn, sortDir])
+
+  function toggleSort(col: SortColumn) {
+    if (sortColumn === col) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
+    else { setSortColumn(col); setSortDir('asc') }
   }
 
   const filteredMindset = activeFilter === 'todos'
@@ -539,157 +582,148 @@ export function Admin() {
               )}
 
               {/* ── Users section ── */}
-              {activeSection === 'users' && (
-                allUsers.length === 0 ? (
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh' }}>
-                    <p style={{ fontSize: 14, color: '#B0AA9E' }}>No hay usuarios registrados aún</p>
-                  </div>
-                ) : (
-                  <div className="bg-white border border-[#E8E4DC]" style={{ borderRadius: 12, overflow: 'hidden' }}>
-                    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                      <thead>
-                        <tr style={{ borderBottom: '1px solid #E8E4DC' }}>
-                          {['', 'Nombre', 'Ciudad', 'Trust score', 'Invitado', 'Estado', 'Registro', ''].map((col, i) => (
-                            <th
-                              key={i}
-                              style={{ padding: '10px 16px', textAlign: 'left', fontSize: 11, fontWeight: 600, color: '#B0AA9E', textTransform: 'uppercase', letterSpacing: '0.06em', whiteSpace: 'nowrap' }}
-                            >
-                              {col}
-                            </th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {allUsers.map((u, i) => {
-                          const isEditing = editingUserId === u.id
-                          const rowBg = i % 2 === 0 ? 'white' : '#FAFAF7'
-                          const rowBorder = i < allUsers.length - 1 ? '1px solid #F0EDE8' : 'none'
-                          const statusLabel = u.mindset_approved === true ? 'approved' : u.mindset_approved === false ? 'rejected' : 'pending'
-                          const statusStyle = u.mindset_approved === true
-                            ? { background: '#EAF3DE', color: '#3B6D11' }
-                            : u.mindset_approved === false
-                            ? { background: '#FCEBEB', color: '#A32D2D' }
-                            : { background: '#EAE6DF', color: '#B0AA9E' }
-                          const inputStyle = { fontSize: 13, color: '#1A1A1A', border: '1px solid #E8E4DC', borderRadius: 6, padding: '4px 8px', outline: 'none' }
+              {activeSection === 'users' && (() => {
+                type ColDef = { key: SortColumn | null; label: string }
+                const COLS: ColDef[] = [
+                  { key: null,     label: '' },
+                  { key: 'name',   label: 'Nombre' },
+                  { key: 'city',   label: 'Ciudad' },
+                  { key: 'trust',  label: 'Trust score' },
+                  { key: 'invite', label: 'Invitado' },
+                  { key: 'status', label: 'Estado' },
+                  { key: 'date',   label: 'Registro' },
+                  { key: null,     label: '' },
+                ]
+                return (
+                  <div>
+                    {/* Search bar */}
+                    <div style={{ marginBottom: 12 }}>
+                      <input
+                        type="text"
+                        value={searchQuery}
+                        onChange={e => setSearchQuery(e.target.value)}
+                        placeholder="Buscar por nombre, ciudad o email..."
+                        style={{ width: '100%', fontSize: 13, color: '#1A1A1A', border: '1px solid #E8E4DC', borderRadius: 8, padding: '8px 14px', outline: 'none', background: 'white', boxSizing: 'border-box' }}
+                      />
+                    </div>
 
-                          return (
-                            <tr key={u.id} style={{ background: rowBg, borderBottom: rowBorder }}>
-                              {/* Avatar */}
-                              <td style={{ padding: '10px 16px', width: 40 }}>
-                                <div style={{ width: 32, height: 32, borderRadius: 8, background: '#EAE6DF', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                  <span style={{ fontSize: 13, fontWeight: 500, color: '#B0AA9E' }}>
-                                    {u.display_name.charAt(0).toUpperCase()}
-                                  </span>
-                                </div>
-                              </td>
-                              {/* Nombre */}
-                              <td style={{ padding: '10px 16px' }}>
-                                <p style={{ fontSize: 13, fontWeight: 500, color: '#1A1A1A' }}>{u.display_name}</p>
-                                {u.email && <p style={{ fontSize: 12, color: '#B0AA9E', marginTop: 1 }}>{u.email}</p>}
-                                {u.travel_style && <p style={{ fontSize: 11, color: '#B0AA9E', marginTop: 1 }}>{u.travel_style}</p>}
-                              </td>
-                              {/* Ciudad */}
-                              <td style={{ padding: '10px 16px', whiteSpace: 'nowrap' }}>
-                                {isEditing ? (
-                                  <input
-                                    type="text"
-                                    value={editValues.current_city}
-                                    onChange={e => setEditValues(prev => ({ ...prev, current_city: e.target.value }))}
-                                    style={{ ...inputStyle, width: 140 }}
-                                  />
-                                ) : (
-                                  <span style={{ fontSize: 13, color: '#1A1A1A' }}>{u.current_city || '—'}</span>
-                                )}
-                              </td>
-                              {/* Trust score */}
-                              <td style={{ padding: '10px 16px' }}>
-                                {isEditing ? (
-                                  <input
-                                    type="number"
-                                    min={0}
-                                    max={100}
-                                    value={editValues.trust_score}
-                                    onChange={e => setEditValues(prev => ({ ...prev, trust_score: Number(e.target.value) }))}
-                                    style={{ ...inputStyle, width: 60 }}
-                                  />
-                                ) : (
-                                  <span style={{ background: '#4A90D9', color: 'white', fontSize: 12, fontWeight: 500, padding: '3px 10px', borderRadius: 6 }}>
-                                    {u.trust_score}
-                                  </span>
-                                )}
-                              </td>
-                              {/* Invitado */}
-                              <td style={{ padding: '10px 16px', fontSize: 13 }}>
-                                {u.has_invite
-                                  ? <span style={{ color: '#3B6D11', fontWeight: 600 }}>✓</span>
-                                  : <span style={{ color: '#B0AA9E' }}>—</span>
-                                }
-                              </td>
-                              {/* Estado */}
-                              <td style={{ padding: '10px 16px' }}>
-                                {isEditing ? (
-                                  <select
-                                    value={editValues.mindset_approved === null ? '' : String(editValues.mindset_approved)}
-                                    onChange={e => {
-                                      const v = e.target.value
-                                      setEditValues(prev => ({ ...prev, mindset_approved: v === '' ? null : v === 'true' }))
-                                    }}
-                                    style={{ ...inputStyle, cursor: 'pointer' }}
-                                  >
-                                    <option value="">pendiente</option>
-                                    <option value="true">aprobado</option>
-                                    <option value="false">rechazado</option>
-                                  </select>
-                                ) : (
-                                  <span style={{ ...statusStyle, fontSize: 10, fontWeight: 500, padding: '3px 8px', borderRadius: 6 }}>
-                                    {statusLabel}
-                                  </span>
-                                )}
-                              </td>
-                              {/* Fecha */}
-                              <td style={{ padding: '10px 16px', fontSize: 12, color: '#B0AA9E', whiteSpace: 'nowrap' }}>
-                                {new Date(u.created_at).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })}
-                              </td>
-                              {/* Editar / Guardar */}
-                              <td style={{ padding: '10px 16px', whiteSpace: 'nowrap' }}>
-                                {isEditing ? (
-                                  <div style={{ display: 'flex', gap: 8 }}>
-                                    <button
-                                      onClick={handleUserSave}
-                                      className="cursor-pointer"
-                                      style={{ fontSize: 12, fontWeight: 500, padding: '4px 12px', borderRadius: 6, background: '#4A90D9', color: 'white', border: 'none' }}
-                                    >
-                                      Guardar
-                                    </button>
-                                    <button
-                                      onClick={() => setEditingUserId(null)}
-                                      className="cursor-pointer"
-                                      style={{ fontSize: 12, fontWeight: 500, padding: '4px 12px', borderRadius: 6, background: 'transparent', color: '#B0AA9E', border: 'none' }}
-                                    >
-                                      Cancelar
-                                    </button>
-                                  </div>
-                                ) : (
-                                  <button
-                                    onClick={() => {
-                                      setEditingUserId(u.id)
-                                      setEditValues({ trust_score: u.trust_score, current_city: u.current_city || '', mindset_approved: u.mindset_approved })
-                                    }}
-                                    className="cursor-pointer"
-                                    style={{ fontSize: 12, fontWeight: 500, padding: '4px 12px', borderRadius: 6, background: 'transparent', color: '#B0AA9E', border: '1px solid #E8E4DC' }}
-                                  >
-                                    Editar
-                                  </button>
-                                )}
-                              </td>
+                    {processedUsers.length === 0 ? (
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '40vh' }}>
+                        <p style={{ fontSize: 14, color: '#B0AA9E' }}>
+                          {allUsers.length === 0 ? 'No hay usuarios registrados aún' : 'Sin resultados para esa búsqueda'}
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="bg-white border border-[#E8E4DC]" style={{ borderRadius: 12, overflow: 'hidden' }}>
+                        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                          <thead>
+                            <tr style={{ borderBottom: '1px solid #E8E4DC' }}>
+                              {COLS.map((col, i) => (
+                                <th
+                                  key={i}
+                                  onClick={col.key ? () => toggleSort(col.key!) : undefined}
+                                  style={{ padding: '10px 16px', textAlign: 'left', fontSize: 11, fontWeight: 600, color: col.key && sortColumn === col.key ? '#4A90D9' : '#B0AA9E', textTransform: 'uppercase', letterSpacing: '0.06em', whiteSpace: 'nowrap', cursor: col.key ? 'pointer' : 'default', userSelect: 'none' }}
+                                >
+                                  {col.label}{col.key && sortColumn === col.key ? (sortDir === 'asc' ? ' ↑' : ' ↓') : ''}
+                                </th>
+                              ))}
                             </tr>
-                          )
-                        })}
-                      </tbody>
-                    </table>
+                          </thead>
+                          <tbody>
+                            {processedUsers.map((u, i) => {
+                              const isEditing = editingUserId === u.id
+                              const email = emailMap[u.user_id] ?? u.email ?? null
+                              const rowBg = i % 2 === 0 ? 'white' : '#FAFAF7'
+                              const rowBorder = i < processedUsers.length - 1 ? '1px solid #F0EDE8' : 'none'
+                              const statusLabel = u.mindset_approved === true ? 'approved' : u.mindset_approved === false ? 'rejected' : 'pending'
+                              const statusStyle = u.mindset_approved === true
+                                ? { background: '#EAF3DE', color: '#3B6D11' }
+                                : u.mindset_approved === false
+                                ? { background: '#FCEBEB', color: '#A32D2D' }
+                                : { background: '#EAE6DF', color: '#B0AA9E' }
+                              const inputStyle = { fontSize: 13, color: '#1A1A1A', border: '1px solid #E8E4DC', borderRadius: 6, padding: '4px 8px', outline: 'none' }
+                              return (
+                                <tr key={u.id} style={{ background: rowBg, borderBottom: rowBorder }}>
+                                  {/* Avatar */}
+                                  <td style={{ padding: '10px 16px', width: 40 }}>
+                                    <div style={{ width: 32, height: 32, borderRadius: 8, background: '#EAE6DF', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                      <span style={{ fontSize: 13, fontWeight: 500, color: '#B0AA9E' }}>
+                                        {u.display_name.charAt(0).toUpperCase()}
+                                      </span>
+                                    </div>
+                                  </td>
+                                  {/* Nombre + email */}
+                                  <td style={{ padding: '10px 16px' }}>
+                                    <p style={{ fontSize: 13, fontWeight: 500, color: '#1A1A1A' }}>{u.display_name}</p>
+                                    {email && <p style={{ fontSize: 12, color: '#B0AA9E', marginTop: 1 }}>{email}</p>}
+                                    {u.travel_style && <p style={{ fontSize: 11, color: '#B0AA9E', marginTop: 1 }}>{u.travel_style}</p>}
+                                  </td>
+                                  {/* Ciudad */}
+                                  <td style={{ padding: '10px 16px', whiteSpace: 'nowrap' }}>
+                                    {isEditing ? (
+                                      <input type="text" value={editValues.current_city} onChange={e => setEditValues(prev => ({ ...prev, current_city: e.target.value }))} style={{ ...inputStyle, width: 140 }} />
+                                    ) : (
+                                      <span style={{ fontSize: 13, color: '#1A1A1A' }}>{u.current_city || '—'}</span>
+                                    )}
+                                  </td>
+                                  {/* Trust score */}
+                                  <td style={{ padding: '10px 16px' }}>
+                                    {isEditing ? (
+                                      <input type="number" min={0} max={100} value={editValues.trust_score} onChange={e => setEditValues(prev => ({ ...prev, trust_score: Number(e.target.value) }))} style={{ ...inputStyle, width: 60 }} />
+                                    ) : (
+                                      <span style={{ background: '#4A90D9', color: 'white', fontSize: 12, fontWeight: 500, padding: '3px 10px', borderRadius: 6 }}>
+                                        {u.trust_score}
+                                      </span>
+                                    )}
+                                  </td>
+                                  {/* Invitado */}
+                                  <td style={{ padding: '10px 16px', fontSize: 13 }}>
+                                    {u.has_invite
+                                      ? <span style={{ color: '#3B6D11', fontWeight: 600 }}>✓</span>
+                                      : <span style={{ color: '#B0AA9E' }}>—</span>
+                                    }
+                                  </td>
+                                  {/* Estado */}
+                                  <td style={{ padding: '10px 16px' }}>
+                                    {isEditing ? (
+                                      <select value={editValues.mindset_approved === null ? '' : String(editValues.mindset_approved)} onChange={e => { const v = e.target.value; setEditValues(prev => ({ ...prev, mindset_approved: v === '' ? null : v === 'true' })) }} style={{ ...inputStyle, cursor: 'pointer' }}>
+                                        <option value="">pendiente</option>
+                                        <option value="true">aprobado</option>
+                                        <option value="false">rechazado</option>
+                                      </select>
+                                    ) : (
+                                      <span style={{ ...statusStyle, fontSize: 10, fontWeight: 500, padding: '3px 8px', borderRadius: 6 }}>
+                                        {statusLabel}
+                                      </span>
+                                    )}
+                                  </td>
+                                  {/* Fecha */}
+                                  <td style={{ padding: '10px 16px', fontSize: 12, color: '#B0AA9E', whiteSpace: 'nowrap' }}>
+                                    {new Date(u.created_at).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })}
+                                  </td>
+                                  {/* Editar / Guardar */}
+                                  <td style={{ padding: '10px 16px', whiteSpace: 'nowrap' }}>
+                                    {isEditing ? (
+                                      <div style={{ display: 'flex', gap: 8 }}>
+                                        <button onClick={handleUserSave} className="cursor-pointer" style={{ fontSize: 12, fontWeight: 500, padding: '4px 12px', borderRadius: 6, background: '#4A90D9', color: 'white', border: 'none' }}>Guardar</button>
+                                        <button onClick={() => setEditingUserId(null)} className="cursor-pointer" style={{ fontSize: 12, fontWeight: 500, padding: '4px 12px', borderRadius: 6, background: 'transparent', color: '#B0AA9E', border: 'none' }}>Cancelar</button>
+                                      </div>
+                                    ) : (
+                                      <button onClick={() => { setEditingUserId(u.id); setEditValues({ trust_score: u.trust_score, current_city: u.current_city || '', mindset_approved: u.mindset_approved }) }} className="cursor-pointer" style={{ fontSize: 12, fontWeight: 500, padding: '4px 12px', borderRadius: 6, background: 'transparent', color: '#B0AA9E', border: '1px solid #E8E4DC' }}>
+                                        Editar
+                                      </button>
+                                    )}
+                                  </td>
+                                </tr>
+                              )
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
                   </div>
                 )
-              )}
+              })()}
 
               {/* ── Invite codes section ── */}
               {activeSection === 'invites' && (
