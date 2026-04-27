@@ -16,6 +16,29 @@ const ALL_INTERESTS = [
   'photography', 'philosophy', 'sport', 'art', 'technology', 'languages', 'cinema',
 ]
 
+const CITIES = [
+  'Abu Dhabi', 'Ámsterdam', 'Antigua Guatemala', 'Auckland', 'Bangkok',
+  'Barcelona', 'Berlín', 'Bogotá', 'Brisbane', 'Buenos Aires', 'Cairo',
+  'Cape Town', 'Ciudad de Guatemala', 'Ciudad de México', 'Copenhagen',
+  'Dubái', 'Dublín', 'Edinburgh', 'Florencia', 'Frankfurt', 'Ginebra',
+  'Granada', 'Helsinki', 'Hong Kong', 'Istanbul', 'Jakarta', 'Johannesburg',
+  'Kiev', 'Kuala Lumpur', 'Lagos', 'Lima', 'Lisboa', 'Londres', 'Los Ángeles',
+  'Madrid', 'Marrakech', 'Medellín', 'Melbourne', 'México City', 'Miami',
+  'Milán', 'Montreal', 'Mumbai', 'Nairobi', 'Nueva York', 'Oslo', 'París',
+  'Praga', 'Roma', 'San Francisco', 'San José', 'Santiago', 'São Paulo',
+  'Seúl', 'Shanghái', 'Singapur', 'Sydney', 'Taipei', 'Tokio',
+  'Toronto', 'Vancouver', 'Varsovia', 'Venecia', 'Viena', 'Zürich',
+  'Bali', 'Chiang Mai', 'Cancún', 'Cartagena', 'La Habana', 'Montevideo',
+  'Oaxaca', 'Punta del Este', 'Quito', 'Santa Marta', 'Tulum', 'Asunción',
+  'La Paz', 'Sucre', 'Cusco', 'Medina', 'Riad', 'Accra', 'Dakar',
+  'Casablanca', 'Túnez', 'Addis Abeba', 'Kampala', 'Dar es Salaam',
+  'Katmandú', 'Colombo', 'Dhaka', 'Karachi', 'Lahore', 'Islamabad',
+  'Tbilisi', 'Ereván', 'Bakú', 'Almaty', 'Tashkent', 'Reikiavik',
+  'Tallinn', 'Riga', 'Vilnius', 'Bratislava', 'Ljubljana', 'Sarajevo',
+  'Belgrado', 'Bucarest', 'Sofía', 'Atenas', 'Nicosia', 'Beirut',
+  'Amán', 'Tel Aviv', 'Jerusalén', 'Bagdad', 'Teherán', 'Kabul',
+]
+
 const SOCIAL_EMOJIS: Record<string, string> = {
   instagram: '📸',
   linkedin: '💼',
@@ -161,11 +184,11 @@ export function Profile() {
 
   const [trips, setTrips] = useState<Trip[]>([])
   const [showTripModal, setShowTripModal] = useState(false)
+  const [editingTrip, setEditingTrip] = useState<Trip | null>(null)
   const [tripCity, setTripCity] = useState('')
-  const [tripCountry, setTripCountry] = useState('')
+  const [tripCityDropdownOpen, setTripCityDropdownOpen] = useState(false)
   const [tripArrivesAt, setTripArrivesAt] = useState('')
   const [tripDepartsAt, setTripDepartsAt] = useState('')
-  const [tripIsCurrent, setTripIsCurrent] = useState(false)
   const [tripNotes, setTripNotes] = useState('')
   const [savingTrip, setSavingTrip] = useState(false)
 
@@ -288,32 +311,59 @@ export function Profile() {
     setTimeout(() => setInviteCopied(false), 2000)
   }
 
-  const handleAddTrip = async () => {
+  const closeTripModal = () => {
+    setShowTripModal(false)
+    setEditingTrip(null)
+    setTripCity(''); setTripArrivesAt(''); setTripDepartsAt(''); setTripNotes('')
+    setTripCityDropdownOpen(false)
+  }
+
+  const openTripForEdit = (trip: Trip) => {
+    setEditingTrip(trip)
+    setTripCity(trip.city)
+    setTripArrivesAt(trip.arrives_at)
+    setTripDepartsAt(trip.departs_at ?? '')
+    setTripNotes(trip.notes ?? '')
+    setShowTripModal(true)
+  }
+
+  const handleSaveTrip = async () => {
     if (!profile?.id || !tripCity.trim() || !tripArrivesAt) return
     setSavingTrip(true)
-    const { data } = await supabase
-      .from('trips')
-      .insert({
-        user_id: profile.id,
-        city: tripCity.trim(),
-        country: tripCountry.trim() || null,
-        arrives_at: tripArrivesAt,
-        departs_at: tripDepartsAt || null,
-        is_current: tripIsCurrent,
-        is_home: false,
-        notes: tripNotes.trim() || null,
-      })
-      .select()
-      .single()
-    if (tripIsCurrent) {
-      await supabase.from('profiles').update({ current_city: tripCity.trim() }).eq('id', profile.id)
+    const today = new Date().toISOString().split('T')[0]
+    const is_current = tripArrivesAt <= today && (!tripDepartsAt || tripDepartsAt >= today)
+    const city = tripCity.trim()
+    const departs_at = tripDepartsAt || null
+
+    if (editingTrip) {
+      const { data } = await supabase
+        .from('trips')
+        .update({ city, arrives_at: tripArrivesAt, departs_at, is_current, notes: tripNotes.trim() || null })
+        .eq('id', editingTrip.id)
+        .select()
+        .single()
+      if (is_current) {
+        await supabase.from('profiles').update({ current_city: city }).eq('id', profile.id)
+      }
+      if (data) {
+        setTrips(prev => prev.map(t => t.id === editingTrip.id ? data : t)
+          .sort((a, b) => a.arrives_at.localeCompare(b.arrives_at)))
+      }
+    } else {
+      const { data } = await supabase
+        .from('trips')
+        .insert({ user_id: profile.id, city, arrives_at: tripArrivesAt, departs_at, is_current, is_home: false, notes: tripNotes.trim() || null })
+        .select()
+        .single()
+      if (is_current) {
+        await supabase.from('profiles').update({ current_city: city }).eq('id', profile.id)
+      }
+      if (data) {
+        setTrips(prev => [...prev, data].sort((a, b) => a.arrives_at.localeCompare(b.arrives_at)))
+      }
     }
-    if (data) {
-      setTrips(prev => [...prev, data].sort((a, b) => a.arrives_at.localeCompare(b.arrives_at)))
-    }
-    setTripCity(''); setTripCountry(''); setTripArrivesAt(''); setTripDepartsAt('')
-    setTripIsCurrent(false); setTripNotes('')
-    setShowTripModal(false)
+
+    closeTripModal()
     setSavingTrip(false)
   }
 
@@ -678,13 +728,24 @@ export function Profile() {
                       </p>
                     </div>
                     {isOwnProfile && (
-                      <button
-                        onClick={() => handleDeleteTrip(trip)}
-                        style={{ fontSize: 16, color: '#B0AA9E', background: 'none',
-                                 border: 'none', cursor: 'pointer', padding: '0 4px' }}
-                      >
-                        ×
-                      </button>
+                      <div style={{ display: 'flex', gap: 2, flexShrink: 0 }}>
+                        <button
+                          onClick={() => openTripForEdit(trip)}
+                          style={{ fontSize: 14, color: '#B0AA9E', background: 'none',
+                                   border: 'none', cursor: 'pointer', padding: '0 5px' }}
+                          title="Editar"
+                        >
+                          ✎
+                        </button>
+                        <button
+                          onClick={() => handleDeleteTrip(trip)}
+                          style={{ fontSize: 16, color: '#B0AA9E', background: 'none',
+                                   border: 'none', cursor: 'pointer', padding: '0 4px' }}
+                          title="Eliminar"
+                        >
+                          ×
+                        </button>
+                      </div>
                     )}
                   </div>
                 )
@@ -849,86 +910,117 @@ export function Profile() {
         )
       }
 
-      {/* Add trip modal */}
-      {showTripModal && (
-        <div className="fixed inset-0 z-50 flex items-end">
-          <div className="absolute inset-0 bg-black/40" onClick={() => setShowTripModal(false)} />
-          <div className="relative w-full max-w-[430px] mx-auto bg-white rounded-t-2xl px-5 pt-5 pb-10 z-10">
-            <div className="flex items-center justify-between mb-5">
-              <p className="text-ink font-bold text-base">Agregar viaje</p>
-              <button
-                onClick={() => setShowTripModal(false)}
-                className="text-muted text-2xl leading-none cursor-pointer hover:text-ink transition"
-              >
-                ×
-              </button>
-            </div>
-            <div className="flex flex-col gap-3">
-              <input
-                type="text"
-                value={tripCity}
-                onChange={e => setTripCity(e.target.value)}
-                placeholder="Ciudad *"
-                className="bg-sand border border-[#E8E4DC] rounded-xl px-4 py-3 text-sm text-ink placeholder:text-muted focus:outline-none focus:border-sky transition"
-              />
-              <input
-                type="text"
-                value={tripCountry}
-                onChange={e => setTripCountry(e.target.value)}
-                placeholder="País (opcional)"
-                className="bg-sand border border-[#E8E4DC] rounded-xl px-4 py-3 text-sm text-ink placeholder:text-muted focus:outline-none focus:border-sky transition"
-              />
-              <div className="flex gap-2">
-                <div className="flex-1">
-                  <label className="text-[10px] font-bold uppercase tracking-wider text-muted pl-1 block mb-1">
-                    Llegada *
-                  </label>
-                  <input
-                    type="date"
-                    value={tripArrivesAt}
-                    onChange={e => setTripArrivesAt(e.target.value)}
-                    className="w-full bg-sand border border-[#E8E4DC] rounded-xl px-3 py-2.5 text-sm text-ink focus:outline-none focus:border-sky transition"
-                  />
-                </div>
-                <div className="flex-1">
-                  <label className="text-[10px] font-bold uppercase tracking-wider text-muted pl-1 block mb-1">
-                    Salida
-                  </label>
-                  <input
-                    type="date"
-                    value={tripDepartsAt}
-                    onChange={e => setTripDepartsAt(e.target.value)}
-                    className="w-full bg-sand border border-[#E8E4DC] rounded-xl px-3 py-2.5 text-sm text-ink focus:outline-none focus:border-sky transition"
-                  />
-                </div>
+      {/* Trip modal */}
+      {showTripModal && (() => {
+        const cityMatches = tripCity.length >= 2
+          ? CITIES.filter(c => c.toLowerCase().includes(tripCity.toLowerCase())).slice(0, 6)
+          : []
+        const dateError = tripDepartsAt && tripArrivesAt && tripDepartsAt < tripArrivesAt
+          ? 'La fecha de salida debe ser después de la llegada'
+          : null
+        const canSave = !!tripCity.trim() && !!tripArrivesAt && !dateError && !savingTrip
+        return (
+          <div className="fixed inset-0 z-50 flex items-end">
+            <div className="absolute inset-0 bg-black/40" onClick={closeTripModal} />
+            <div className="relative w-full max-w-[430px] mx-auto bg-white rounded-t-2xl px-5 pt-5 pb-10 z-10">
+              <div className="flex items-center justify-between mb-5">
+                <p className="text-ink font-bold text-base">
+                  {editingTrip ? 'Editar viaje' : 'Agregar viaje'}
+                </p>
+                <button
+                  onClick={closeTripModal}
+                  className="text-muted text-2xl leading-none cursor-pointer hover:text-ink transition"
+                >
+                  ×
+                </button>
               </div>
-              <input
-                type="text"
-                value={tripNotes}
-                onChange={e => setTripNotes(e.target.value)}
-                placeholder="¿Algo que quieras compartir? (opcional)"
-                className="bg-sand border border-[#E8E4DC] rounded-xl px-4 py-3 text-sm text-ink placeholder:text-muted focus:outline-none focus:border-sky transition"
-              />
-              <label className="flex items-center gap-2.5 cursor-pointer">
+              <div className="flex flex-col gap-3">
+                {/* City autocomplete */}
+                <div style={{ position: 'relative' }}>
+                  <input
+                    type="text"
+                    value={tripCity}
+                    onChange={e => { setTripCity(e.target.value); setTripCityDropdownOpen(true) }}
+                    onFocus={() => setTripCityDropdownOpen(true)}
+                    onBlur={() => setTimeout(() => setTripCityDropdownOpen(false), 150)}
+                    placeholder="Ciudad *"
+                    className="w-full bg-sand border border-[#E8E4DC] rounded-xl px-4 py-3 text-sm text-ink placeholder:text-muted focus:outline-none focus:border-sky transition"
+                  />
+                  {tripCityDropdownOpen && cityMatches.length > 0 && (
+                    <div style={{
+                      position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 10,
+                      background: 'white', border: '1px solid #E8E4DC', borderRadius: 8,
+                      marginTop: 4, overflow: 'hidden', boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
+                    }}>
+                      {cityMatches.map(city => (
+                        <button
+                          key={city}
+                          onMouseDown={() => { setTripCity(city); setTripCityDropdownOpen(false) }}
+                          style={{
+                            display: 'block', width: '100%', textAlign: 'left',
+                            padding: '0 14px', height: 36, fontSize: 14, color: '#1A1A1A',
+                            background: 'none', border: 'none', cursor: 'pointer',
+                          }}
+                          onMouseEnter={e => (e.currentTarget.style.background = '#EAE6DF')}
+                          onMouseLeave={e => (e.currentTarget.style.background = 'none')}
+                        >
+                          {city}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Dates */}
+                <div className="flex gap-2">
+                  <div className="flex-1">
+                    <label className="text-[10px] font-bold uppercase tracking-wider text-muted pl-1 block mb-1">
+                      Llegada *
+                    </label>
+                    <input
+                      type="date"
+                      value={tripArrivesAt}
+                      onChange={e => setTripArrivesAt(e.target.value)}
+                      className="w-full bg-sand border border-[#E8E4DC] rounded-xl px-3 py-2.5 text-sm text-ink focus:outline-none focus:border-sky transition"
+                    />
+                  </div>
+                  <div className="flex-1">
+                    <label className="text-[10px] font-bold uppercase tracking-wider text-muted pl-1 block mb-1">
+                      Salida
+                    </label>
+                    <input
+                      type="date"
+                      value={tripDepartsAt}
+                      onChange={e => setTripDepartsAt(e.target.value)}
+                      className="w-full bg-sand border border-[#E8E4DC] rounded-xl px-3 py-2.5 text-sm text-ink focus:outline-none focus:border-sky transition"
+                    />
+                  </div>
+                </div>
+
+                {dateError && (
+                  <p style={{ fontSize: 12, color: '#A32D2D', marginTop: -4 }}>{dateError}</p>
+                )}
+
                 <input
-                  type="checkbox"
-                  checked={tripIsCurrent}
-                  onChange={e => setTripIsCurrent(e.target.checked)}
-                  className="w-4 h-4 rounded accent-sky cursor-pointer"
+                  type="text"
+                  value={tripNotes}
+                  onChange={e => setTripNotes(e.target.value)}
+                  placeholder="¿Algo que quieras compartir? (opcional)"
+                  className="bg-sand border border-[#E8E4DC] rounded-xl px-4 py-3 text-sm text-ink placeholder:text-muted focus:outline-none focus:border-sky transition"
                 />
-                <span className="text-sm text-ink">Estoy aquí ahora</span>
-              </label>
-              <button
-                onClick={handleAddTrip}
-                disabled={!tripCity.trim() || !tripArrivesAt || savingTrip}
-                className="w-full bg-ink text-white rounded-xl py-3 text-sm font-bold disabled:opacity-40 active:opacity-80 transition cursor-pointer mt-1"
-              >
-                {savingTrip ? 'Guardando…' : 'Guardar viaje'}
-              </button>
+
+                <button
+                  onClick={handleSaveTrip}
+                  disabled={!canSave}
+                  className="w-full bg-ink text-white rounded-xl py-3 text-sm font-bold disabled:opacity-40 active:opacity-80 transition cursor-pointer mt-1"
+                >
+                  {savingTrip ? 'Guardando…' : 'Guardar viaje'}
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )
+      })()}
     </div>
   )
 }
