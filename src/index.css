@@ -25,11 +25,9 @@
 
   #root {
     width: 100%;
-    max-width: 430px;
     min-height: 100dvh;
     min-height: -webkit-fill-available;
     background-color: #EAE6DF;
-    margin: 0 auto;
   }
 }
 
