@@ -9,7 +9,7 @@ export interface Profile {
   user_id: string
   display_name: string
   avatar_url?: string
-  origin_city: string
+  home_city: string
   current_city: string
   trip_start_date: string | null
   trip_end_date: string | null
