@@ -30,6 +30,17 @@ interface MindsetProfile {
   mindset_recommendation: string | null
 }
 
+interface UserProfile {
+  id: string
+  display_name: string
+  current_city: string
+  trust_score: number
+  has_invite: boolean
+  mindset_approved: boolean | null
+  created_at: string
+  travel_style: string | null
+}
+
 const POSITIVE_TAGS = new Set(['curioso', 'reflexivo', 'viajero real', 'growth mindset', 'empático', 'creativo'])
 const NEGATIVE_TAGS = new Set(['superficial', 'genérico', 'respuesta corta', 'copy-paste sospechoso'])
 
@@ -132,6 +143,7 @@ export function Admin() {
   const { profile } = useAuth()
   const [profiles, setProfiles] = useState<PendingProfile[]>([])
   const [mindsetProfiles, setMindsetProfiles] = useState<MindsetProfile[]>([])
+  const [allUsers, setAllUsers] = useState<UserProfile[]>([])
   const [totalUsers, setTotalUsers] = useState(0)
   const [loading, setLoading] = useState(true)
   const [activeSection, setActiveSection] = useState<ActiveSection>('mindset')
@@ -157,10 +169,15 @@ export function Admin() {
       supabase
         .from('profiles')
         .select('id', { count: 'exact', head: true }),
-    ]).then(([res1, res2, res3]) => {
+      supabase
+        .from('profiles')
+        .select('id, display_name, current_city, trust_score, has_invite, mindset_approved, created_at, travel_style')
+        .order('created_at', { ascending: false }),
+    ]).then(([res1, res2, res3, res4]) => {
       setProfiles(res1.data ?? [])
       setMindsetProfiles(res2.data ?? [])
       setTotalUsers(res3.count ?? 0)
+      setAllUsers(res4.data ?? [])
       setLoading(false)
     })
   }, [isAdmin])
@@ -466,8 +483,88 @@ export function Admin() {
                 )
               )}
 
+              {/* ── Users section ── */}
+              {activeSection === 'users' && (
+                allUsers.length === 0 ? (
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh' }}>
+                    <p style={{ fontSize: 14, color: '#B0AA9E' }}>No hay usuarios registrados aún</p>
+                  </div>
+                ) : (
+                  <div className="bg-white border border-[#E8E4DC]" style={{ borderRadius: 12, overflow: 'hidden' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                      <thead>
+                        <tr style={{ borderBottom: '1px solid #E8E4DC' }}>
+                          {['', 'Nombre', 'Ciudad', 'Trust score', 'Invitado', 'Estado', 'Registro'].map(col => (
+                            <th
+                              key={col}
+                              style={{ padding: '10px 16px', textAlign: 'left', fontSize: 11, fontWeight: 600, color: '#B0AA9E', textTransform: 'uppercase', letterSpacing: '0.06em', whiteSpace: 'nowrap' }}
+                            >
+                              {col}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {allUsers.map((u, i) => {
+                          const statusLabel = u.mindset_approved === true ? 'approved' : u.mindset_approved === false ? 'rejected' : 'pending'
+                          const statusStyle = u.mindset_approved === true
+                            ? { background: '#EAF3DE', color: '#3B6D11' }
+                            : u.mindset_approved === false
+                            ? { background: '#FCEBEB', color: '#A32D2D' }
+                            : { background: '#EAE6DF', color: '#B0AA9E' }
+                          return (
+                            <tr key={u.id} style={{ background: i % 2 === 0 ? 'white' : '#FAFAF7', borderBottom: i < allUsers.length - 1 ? '1px solid #F0EDE8' : 'none' }}>
+                              {/* Avatar */}
+                              <td style={{ padding: '10px 16px', width: 40 }}>
+                                <div style={{ width: 32, height: 32, borderRadius: 8, background: '#EAE6DF', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                  <span style={{ fontSize: 13, fontWeight: 500, color: '#B0AA9E' }}>
+                                    {u.display_name.charAt(0).toUpperCase()}
+                                  </span>
+                                </div>
+                              </td>
+                              {/* Nombre */}
+                              <td style={{ padding: '10px 16px' }}>
+                                <p style={{ fontSize: 13, fontWeight: 500, color: '#1A1A1A' }}>{u.display_name}</p>
+                                {u.travel_style && <p style={{ fontSize: 11, color: '#B0AA9E', marginTop: 1 }}>{u.travel_style}</p>}
+                              </td>
+                              {/* Ciudad */}
+                              <td style={{ padding: '10px 16px', fontSize: 13, color: '#1A1A1A', whiteSpace: 'nowrap' }}>
+                                {u.current_city || '—'}
+                              </td>
+                              {/* Trust score */}
+                              <td style={{ padding: '10px 16px' }}>
+                                <span style={{ background: '#1A1A1A', color: '#4A90D9', fontSize: 11, fontWeight: 500, padding: '3px 8px', borderRadius: 6 }}>
+                                  {u.trust_score}
+                                </span>
+                              </td>
+                              {/* Invitado */}
+                              <td style={{ padding: '10px 16px', fontSize: 13 }}>
+                                {u.has_invite
+                                  ? <span style={{ color: '#3B6D11', fontWeight: 600 }}>✓</span>
+                                  : <span style={{ color: '#B0AA9E' }}>—</span>
+                                }
+                              </td>
+                              {/* Estado */}
+                              <td style={{ padding: '10px 16px' }}>
+                                <span style={{ ...statusStyle, fontSize: 10, fontWeight: 500, padding: '3px 8px', borderRadius: 6 }}>
+                                  {statusLabel}
+                                </span>
+                              </td>
+                              {/* Fecha */}
+                              <td style={{ padding: '10px 16px', fontSize: 12, color: '#B0AA9E', whiteSpace: 'nowrap' }}>
+                                {new Date(u.created_at).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })}
+                              </td>
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )
+              )}
+
               {/* ── Placeholder sections ── */}
-              {(activeSection === 'users' || activeSection === 'plans' || activeSection === 'connections') && (
+              {(activeSection === 'plans' || activeSection === 'connections') && (
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '60vh', gap: 12 }}>
                   <div style={{ width: 36, height: 36, borderRadius: '50%', border: '2px dashed #B0AA9E', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     <span style={{ color: '#B0AA9E', fontSize: 14, lineHeight: 1 }}>—</span>
