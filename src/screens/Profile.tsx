@@ -346,10 +346,6 @@ export function Profile() {
     `https://picsum.photos/seed/${hashString(profile.id + 'c3')}/400/500`,
   ]
 
-  const today = new Date(); today.setHours(0, 0, 0, 0)
-  const hasFutureTripS = trips.some(t => t.is_current || new Date(t.arrives_at + 'T12:00:00') >= today)
-  const tripsSectionTitle = hasFutureTripS ? 'Próximos destinos' : 'Ciudades visitadas'
-
   return (
     <div className="min-h-screen bg-cream flex flex-col">
 
@@ -624,54 +620,68 @@ export function Profile() {
           </div>
         </div>
 
-        {/* Trips section */}
-        {trips.length > 0 && (
-          <div>
-            <p className="text-[10px] font-bold text-muted uppercase tracking-widest mb-2">
-              {tripsSectionTitle}
+        {/* TRIPS SECTION */}
+        {(trips.length > 0 || isOwnProfile) && (
+          <div style={{ paddingBottom: 4 }}>
+            <p style={{ fontSize: 11, fontWeight: 500, color: '#B0AA9E',
+                        textTransform: 'uppercase', letterSpacing: '0.08em',
+                        marginBottom: 10 }}>
+              {trips.some(t => new Date(t.arrives_at) > new Date())
+                ? 'Próximos destinos'
+                : 'Ciudades visitadas'}
             </p>
-            <div className="flex flex-col gap-2">
-              {trips.map(t => {
-                const arrives = new Date(t.arrives_at + 'T12:00:00')
-                let badgeLabel: string
-                let badgeColor: string
-                if (t.is_current) { badgeLabel = 'Aquí ahora'; badgeColor = '#4A90D9' }
-                else if (arrives >= today) { badgeLabel = 'Próximo'; badgeColor = '#E07A30' }
-                else { badgeLabel = 'Visitó'; badgeColor = '#B0AA9E' }
 
-                const dateStr = t.departs_at
-                  ? `${formatTripDate(t.arrives_at)} → ${formatTripDate(t.departs_at)}`
-                  : `${formatTripDate(t.arrives_at)} →`
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {trips.map(trip => {
+                const todayStr = new Date().toISOString().split('T')[0]
+                const isCurrent = trip.is_current ||
+                  (trip.arrives_at <= todayStr && (!trip.departs_at || trip.departs_at >= todayStr))
+                const isFuture = trip.arrives_at > todayStr
+                const isPast = !!(trip.departs_at && trip.departs_at < todayStr)
 
                 return (
-                  <div
-                    key={t.id}
-                    className="bg-white border border-[#E8E4DC] rounded-xl px-4 py-3 flex items-center justify-between"
-                  >
-                    <div className="flex items-center gap-3 min-w-0">
-                      <span className="text-lg flex-shrink-0">🏙</span>
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <p className="text-ink text-sm font-bold">
-                            {t.city}{t.country ? `, ${t.country}` : ''}
-                          </p>
-                          <span
-                            className="text-[10px] font-semibold px-2 py-0.5 rounded-full flex-shrink-0"
-                            style={{ background: `${badgeColor}18`, color: badgeColor }}
-                          >
-                            {badgeLabel}
+                  <div key={trip.id} style={{
+                    background: 'white', border: '0.5px solid #E8E4DC',
+                    borderRadius: 12, padding: '10px 14px',
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  }}>
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span style={{ fontSize: 14, fontWeight: 500, color: '#1A1A1A' }}>
+                          {trip.city}{trip.country ? `, ${trip.country}` : ''}
+                        </span>
+                        {isCurrent && (
+                          <span style={{ fontSize: 10, fontWeight: 500,
+                                         background: '#E6F1FB', color: '#185FA5',
+                                         padding: '2px 8px', borderRadius: 10 }}>
+                            Aquí ahora
                           </span>
-                        </div>
-                        <p className="text-muted text-xs mt-0.5">{dateStr}</p>
-                        {t.notes && (
-                          <p className="text-muted text-xs mt-0.5 italic">{t.notes}</p>
+                        )}
+                        {!isCurrent && isFuture && (
+                          <span style={{ fontSize: 10, fontWeight: 500,
+                                          background: '#FAEEDA', color: '#854F0B',
+                                          padding: '2px 8px', borderRadius: 10 }}>
+                            Próximo
+                          </span>
+                        )}
+                        {!isCurrent && !isFuture && isPast && (
+                          <span style={{ fontSize: 10, fontWeight: 500,
+                                          background: '#F1EFE8', color: '#B0AA9E',
+                                          padding: '2px 8px', borderRadius: 10 }}>
+                            Visitó
+                          </span>
                         )}
                       </div>
+                      <p style={{ fontSize: 12, color: '#B0AA9E', marginTop: 2 }}>
+                        {formatTripDate(trip.arrives_at)}
+                        {trip.departs_at ? ` → ${formatTripDate(trip.departs_at)}` : ' →'}
+                      </p>
                     </div>
                     {isOwnProfile && (
                       <button
-                        onClick={() => handleDeleteTrip(t)}
-                        className="ml-3 flex-shrink-0 w-6 h-6 flex items-center justify-center rounded-full text-muted hover:text-red-400 hover:bg-red-50 transition cursor-pointer text-base leading-none"
+                        onClick={() => handleDeleteTrip(trip)}
+                        style={{ fontSize: 16, color: '#B0AA9E', background: 'none',
+                                 border: 'none', cursor: 'pointer', padding: '0 4px' }}
                       >
                         ×
                       </button>
@@ -680,25 +690,19 @@ export function Profile() {
                 )
               })}
             </div>
+
             {isOwnProfile && (
               <button
                 onClick={() => setShowTripModal(true)}
-                className="w-full mt-2 border border-dashed border-[#E8E4DC] rounded-xl py-2.5 text-xs font-bold text-muted hover:bg-sand transition cursor-pointer"
+                style={{ marginTop: 10, width: '100%', padding: '10px',
+                         background: 'none', border: '1px dashed #E8E4DC',
+                         borderRadius: 12, fontSize: 13, color: '#B0AA9E',
+                         cursor: 'pointer' }}
               >
                 + Agregar viaje
               </button>
             )}
           </div>
-        )}
-
-        {/* Add trip button when list is empty (own profile only) */}
-        {trips.length === 0 && isOwnProfile && (
-          <button
-            onClick={() => setShowTripModal(true)}
-            className="w-full border border-dashed border-[#E8E4DC] rounded-xl py-3 text-xs font-bold text-muted hover:bg-sand transition cursor-pointer"
-          >
-            + Agregar viaje
-          </button>
         )}
 
         {/* Social links — own profile always visible */}
