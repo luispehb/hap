@@ -165,7 +165,6 @@ export function Admin() {
   const [inviteCodes, setInviteCodes] = useState<InviteCode[]>([])
   const [newCodeId, setNewCodeId] = useState<string | null>(null)
   const [copiedCode, setCopiedCode] = useState<string | null>(null)
-  const [emailMap, setEmailMap] = useState<Record<string, string>>({})
   const [sortColumn, setSortColumn] = useState<SortColumn>('date')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
   const [searchQuery, setSearchQuery] = useState('')
@@ -208,9 +207,6 @@ export function Admin() {
       setAllUsers(res4.data ?? [])
       setInviteCodes(res5.data ?? [])
       setLoading(false)
-      supabase.functions.invoke('get-users-admin').then(({ data }) => {
-        if (data?.emails) setEmailMap(data.emails)
-      })
     })
   }, [isAdmin])
 
@@ -299,7 +295,7 @@ export function Admin() {
       list = list.filter(u =>
         u.display_name.toLowerCase().includes(q) ||
         (u.current_city ?? '').toLowerCase().includes(q) ||
-        (emailMap[u.user_id] ?? u.email ?? '').toLowerCase().includes(q)
+        (u.email ?? '').toLowerCase().includes(q)
       )
     }
     list.sort((a, b) => {
@@ -318,7 +314,7 @@ export function Admin() {
       return 0
     })
     return list
-  }, [allUsers, emailMap, searchQuery, sortColumn, sortDir])
+  }, [allUsers, searchQuery, sortColumn, sortDir])
 
   function toggleSort(col: SortColumn) {
     if (sortColumn === col) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
@@ -646,7 +642,7 @@ export function Admin() {
                           <tbody>
                             {processedUsers.map((u, i) => {
                               const isEditing = editingUserId === u.id
-                              const email = emailMap[u.user_id] ?? u.email ?? null
+                              const email = u.email ?? null
                               const rowBg = i % 2 === 0 ? 'white' : '#FAFAF7'
                               const rowBorder = i < processedUsers.length - 1 ? '1px solid #F0EDE8' : 'none'
                               const statusLabel = u.mindset_approved === true ? 'approved' : u.mindset_approved === false ? 'rejected' : 'pending'
