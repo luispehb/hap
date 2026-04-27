@@ -5,7 +5,7 @@ import { supabase } from '../lib/supabase'
 
 const ADMIN_USER_ID = 'aeef7b13-4e49-4c3d-a8d8-372dc5566d22'
 
-type ActiveSection = 'mindset' | 'memberships' | 'users' | 'plans' | 'connections'
+type ActiveSection = 'mindset' | 'memberships' | 'users' | 'plans' | 'connections' | 'invites'
 type ActiveFilter = 'todos' | 'approve' | 'review' | 'doubt'
 
 interface PendingProfile {
@@ -39,6 +39,15 @@ interface UserProfile {
   mindset_approved: boolean | null
   created_at: string
   travel_style: string | null
+  email: string | null
+}
+
+interface InviteCode {
+  id: string
+  code: string
+  used: boolean
+  created_at: string
+  inviter_id: string
 }
 
 const POSITIVE_TAGS = new Set(['curioso', 'reflexivo', 'viajero real', 'growth mindset', 'empático', 'creativo'])
@@ -136,15 +145,21 @@ const SECTION_META: Record<ActiveSection, { title: string; sub: string }> = {
   users: { title: 'Usuarios', sub: 'todos los usuarios registrados en la plataforma' },
   plans: { title: 'Planes activos', sub: 'planes activos en este momento' },
   connections: { title: 'Conexiones', sub: 'conexiones entre usuarios' },
+  invites: { title: 'Invite codes', sub: 'códigos de invitación generados' },
 }
 
 export function Admin() {
   useNavigate()
-  const { profile } = useAuth()
+  const { profile, user } = useAuth()
   const [profiles, setProfiles] = useState<PendingProfile[]>([])
   const [mindsetProfiles, setMindsetProfiles] = useState<MindsetProfile[]>([])
   const [allUsers, setAllUsers] = useState<UserProfile[]>([])
   const [totalUsers, setTotalUsers] = useState(0)
+  const [editingUserId, setEditingUserId] = useState<string | null>(null)
+  const [editValues, setEditValues] = useState<{ trust_score: number; current_city: string; mindset_approved: boolean | null }>({ trust_score: 0, current_city: '', mindset_approved: null })
+  const [inviteCodes, setInviteCodes] = useState<InviteCode[]>([])
+  const [newCodeId, setNewCodeId] = useState<string | null>(null)
+  const [copiedCode, setCopiedCode] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [activeSection, setActiveSection] = useState<ActiveSection>('mindset')
   const [activeFilter, setActiveFilter] = useState<ActiveFilter>('todos')
@@ -171,13 +186,18 @@ export function Admin() {
         .select('id', { count: 'exact', head: true }),
       supabase
         .from('profiles')
-        .select('id, display_name, current_city, trust_score, has_invite, mindset_approved, created_at, travel_style')
+        .select('id, display_name, current_city, trust_score, has_invite, mindset_approved, created_at, travel_style, email')
         .order('created_at', { ascending: false }),
-    ]).then(([res1, res2, res3, res4]) => {
+      supabase
+        .from('invitations')
+        .select('*')
+        .order('created_at', { ascending: false }),
+    ]).then(([res1, res2, res3, res4, res5]) => {
       setProfiles(res1.data ?? [])
       setMindsetProfiles(res2.data ?? [])
       setTotalUsers(res3.count ?? 0)
       setAllUsers(res4.data ?? [])
+      setInviteCodes(res5.data ?? [])
       setLoading(false)
     })
   }, [isAdmin])
@@ -197,6 +217,40 @@ export function Admin() {
       .update({ mindset_approved: true, trust_score: 60 })
       .eq('id', profileId)
     setMindsetProfiles(prev => prev.filter(p => p.id !== profileId))
+  }
+
+  const handleGenerateCode = async () => {
+    if (!user) return
+    const code = Math.random().toString(36).substring(2, 10).toUpperCase()
+    const { data } = await supabase
+      .from('invitations')
+      .insert({ inviter_id: user.id, code, used: false })
+      .select()
+      .single()
+    if (data) {
+      setInviteCodes(prev => [data, ...prev])
+      setNewCodeId(data.id)
+      setTimeout(() => setNewCodeId(null), 3000)
+    }
+  }
+
+  const handleCopyCode = (code: string) => {
+    navigator.clipboard.writeText(code)
+    setCopiedCode(code)
+    setTimeout(() => setCopiedCode(null), 2000)
+  }
+
+  const handleUserSave = async () => {
+    if (!editingUserId) return
+    await supabase.from('profiles')
+      .update({
+        trust_score: editValues.trust_score,
+        current_city: editValues.current_city,
+        mindset_approved: editValues.mindset_approved,
+      })
+      .eq('id', editingUserId)
+    setAllUsers(prev => prev.map(u => u.id === editingUserId ? { ...u, ...editValues } : u))
+    setEditingUserId(null)
   }
 
   const handleMindsetReject = async (profileId: string) => {
@@ -258,6 +312,7 @@ export function Admin() {
             DATOS
           </p>
           <NavItem label="Usuarios" active={activeSection === 'users'} onClick={() => setActiveSection('users')} />
+          <NavItem label="Invite codes" active={activeSection === 'invites'} onClick={() => setActiveSection('invites')} />
           <NavItem label="Planes activos" active={activeSection === 'plans'} onClick={() => setActiveSection('plans')} />
           <NavItem label="Conexiones" active={activeSection === 'connections'} onClick={() => setActiveSection('connections')} />
         </nav>
@@ -494,9 +549,9 @@ export function Admin() {
                     <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                       <thead>
                         <tr style={{ borderBottom: '1px solid #E8E4DC' }}>
-                          {['', 'Nombre', 'Ciudad', 'Trust score', 'Invitado', 'Estado', 'Registro'].map(col => (
+                          {['', 'Nombre', 'Ciudad', 'Trust score', 'Invitado', 'Estado', 'Registro', ''].map((col, i) => (
                             <th
-                              key={col}
+                              key={i}
                               style={{ padding: '10px 16px', textAlign: 'left', fontSize: 11, fontWeight: 600, color: '#B0AA9E', textTransform: 'uppercase', letterSpacing: '0.06em', whiteSpace: 'nowrap' }}
                             >
                               {col}
@@ -506,14 +561,19 @@ export function Admin() {
                       </thead>
                       <tbody>
                         {allUsers.map((u, i) => {
+                          const isEditing = editingUserId === u.id
+                          const rowBg = i % 2 === 0 ? 'white' : '#FAFAF7'
+                          const rowBorder = i < allUsers.length - 1 ? '1px solid #F0EDE8' : 'none'
                           const statusLabel = u.mindset_approved === true ? 'approved' : u.mindset_approved === false ? 'rejected' : 'pending'
                           const statusStyle = u.mindset_approved === true
                             ? { background: '#EAF3DE', color: '#3B6D11' }
                             : u.mindset_approved === false
                             ? { background: '#FCEBEB', color: '#A32D2D' }
                             : { background: '#EAE6DF', color: '#B0AA9E' }
+                          const inputStyle = { fontSize: 13, color: '#1A1A1A', border: '1px solid #E8E4DC', borderRadius: 6, padding: '4px 8px', outline: 'none' }
+
                           return (
-                            <tr key={u.id} style={{ background: i % 2 === 0 ? 'white' : '#FAFAF7', borderBottom: i < allUsers.length - 1 ? '1px solid #F0EDE8' : 'none' }}>
+                            <tr key={u.id} style={{ background: rowBg, borderBottom: rowBorder }}>
                               {/* Avatar */}
                               <td style={{ padding: '10px 16px', width: 40 }}>
                                 <div style={{ width: 32, height: 32, borderRadius: 8, background: '#EAE6DF', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -525,17 +585,38 @@ export function Admin() {
                               {/* Nombre */}
                               <td style={{ padding: '10px 16px' }}>
                                 <p style={{ fontSize: 13, fontWeight: 500, color: '#1A1A1A' }}>{u.display_name}</p>
+                                {u.email && <p style={{ fontSize: 12, color: '#B0AA9E', marginTop: 1 }}>{u.email}</p>}
                                 {u.travel_style && <p style={{ fontSize: 11, color: '#B0AA9E', marginTop: 1 }}>{u.travel_style}</p>}
                               </td>
                               {/* Ciudad */}
-                              <td style={{ padding: '10px 16px', fontSize: 13, color: '#1A1A1A', whiteSpace: 'nowrap' }}>
-                                {u.current_city || '—'}
+                              <td style={{ padding: '10px 16px', whiteSpace: 'nowrap' }}>
+                                {isEditing ? (
+                                  <input
+                                    type="text"
+                                    value={editValues.current_city}
+                                    onChange={e => setEditValues(prev => ({ ...prev, current_city: e.target.value }))}
+                                    style={{ ...inputStyle, width: 140 }}
+                                  />
+                                ) : (
+                                  <span style={{ fontSize: 13, color: '#1A1A1A' }}>{u.current_city || '—'}</span>
+                                )}
                               </td>
                               {/* Trust score */}
                               <td style={{ padding: '10px 16px' }}>
-                                <span style={{ background: '#1A1A1A', color: '#4A90D9', fontSize: 11, fontWeight: 500, padding: '3px 8px', borderRadius: 6 }}>
-                                  {u.trust_score}
-                                </span>
+                                {isEditing ? (
+                                  <input
+                                    type="number"
+                                    min={0}
+                                    max={100}
+                                    value={editValues.trust_score}
+                                    onChange={e => setEditValues(prev => ({ ...prev, trust_score: Number(e.target.value) }))}
+                                    style={{ ...inputStyle, width: 60 }}
+                                  />
+                                ) : (
+                                  <span style={{ background: '#4A90D9', color: 'white', fontSize: 12, fontWeight: 500, padding: '3px 10px', borderRadius: 6 }}>
+                                    {u.trust_score}
+                                  </span>
+                                )}
                               </td>
                               {/* Invitado */}
                               <td style={{ padding: '10px 16px', fontSize: 13 }}>
@@ -546,13 +627,60 @@ export function Admin() {
                               </td>
                               {/* Estado */}
                               <td style={{ padding: '10px 16px' }}>
-                                <span style={{ ...statusStyle, fontSize: 10, fontWeight: 500, padding: '3px 8px', borderRadius: 6 }}>
-                                  {statusLabel}
-                                </span>
+                                {isEditing ? (
+                                  <select
+                                    value={editValues.mindset_approved === null ? '' : String(editValues.mindset_approved)}
+                                    onChange={e => {
+                                      const v = e.target.value
+                                      setEditValues(prev => ({ ...prev, mindset_approved: v === '' ? null : v === 'true' }))
+                                    }}
+                                    style={{ ...inputStyle, cursor: 'pointer' }}
+                                  >
+                                    <option value="">pendiente</option>
+                                    <option value="true">aprobado</option>
+                                    <option value="false">rechazado</option>
+                                  </select>
+                                ) : (
+                                  <span style={{ ...statusStyle, fontSize: 10, fontWeight: 500, padding: '3px 8px', borderRadius: 6 }}>
+                                    {statusLabel}
+                                  </span>
+                                )}
                               </td>
                               {/* Fecha */}
                               <td style={{ padding: '10px 16px', fontSize: 12, color: '#B0AA9E', whiteSpace: 'nowrap' }}>
                                 {new Date(u.created_at).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })}
+                              </td>
+                              {/* Editar / Guardar */}
+                              <td style={{ padding: '10px 16px', whiteSpace: 'nowrap' }}>
+                                {isEditing ? (
+                                  <div style={{ display: 'flex', gap: 8 }}>
+                                    <button
+                                      onClick={handleUserSave}
+                                      className="cursor-pointer"
+                                      style={{ fontSize: 12, fontWeight: 500, padding: '4px 12px', borderRadius: 6, background: '#4A90D9', color: 'white', border: 'none' }}
+                                    >
+                                      Guardar
+                                    </button>
+                                    <button
+                                      onClick={() => setEditingUserId(null)}
+                                      className="cursor-pointer"
+                                      style={{ fontSize: 12, fontWeight: 500, padding: '4px 12px', borderRadius: 6, background: 'transparent', color: '#B0AA9E', border: 'none' }}
+                                    >
+                                      Cancelar
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <button
+                                    onClick={() => {
+                                      setEditingUserId(u.id)
+                                      setEditValues({ trust_score: u.trust_score, current_city: u.current_city || '', mindset_approved: u.mindset_approved })
+                                    }}
+                                    className="cursor-pointer"
+                                    style={{ fontSize: 12, fontWeight: 500, padding: '4px 12px', borderRadius: 6, background: 'transparent', color: '#B0AA9E', border: '1px solid #E8E4DC' }}
+                                  >
+                                    Editar
+                                  </button>
+                                )}
                               </td>
                             </tr>
                           )
@@ -561,6 +689,80 @@ export function Admin() {
                     </table>
                   </div>
                 )
+              )}
+
+              {/* ── Invite codes section ── */}
+              {activeSection === 'invites' && (
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16 }}>
+                    <button
+                      onClick={handleGenerateCode}
+                      className="cursor-pointer transition-all hover:opacity-90"
+                      style={{ fontSize: 13, fontWeight: 500, padding: '7px 16px', borderRadius: 8, background: '#4A90D9', color: 'white', border: 'none' }}
+                    >
+                      + Generar código
+                    </button>
+                  </div>
+                  {inviteCodes.length === 0 ? (
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '40vh' }}>
+                      <p style={{ fontSize: 14, color: '#B0AA9E' }}>No hay códigos aún · genera el primero</p>
+                    </div>
+                  ) : (
+                    <div className="bg-white border border-[#E8E4DC]" style={{ borderRadius: 12, overflow: 'hidden' }}>
+                      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                        <thead>
+                          <tr style={{ borderBottom: '1px solid #E8E4DC' }}>
+                            {['Código', 'Creado', 'Estado'].map(col => (
+                              <th
+                                key={col}
+                                style={{ padding: '10px 16px', textAlign: 'left', fontSize: 11, fontWeight: 600, color: '#B0AA9E', textTransform: 'uppercase', letterSpacing: '0.06em' }}
+                              >
+                                {col}
+                              </th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {inviteCodes.map((inv, i) => {
+                            const isNew = newCodeId === inv.id
+                            const isCopied = copiedCode === inv.code
+                            return (
+                              <tr
+                                key={inv.id}
+                                style={{ background: i % 2 === 0 ? 'white' : '#FAFAF7', borderBottom: i < inviteCodes.length - 1 ? '1px solid #F0EDE8' : 'none' }}
+                              >
+                                <td style={{ padding: '10px 16px' }}>
+                                  <button
+                                    onClick={() => handleCopyCode(inv.code)}
+                                    className="cursor-pointer transition-all"
+                                    style={{ fontFamily: 'monospace', fontSize: 13, fontWeight: 600, color: isNew ? '#4A90D9' : '#1A1A1A', background: 'none', border: 'none', padding: 0, letterSpacing: '0.1em' }}
+                                    title="Copiar al portapapeles"
+                                  >
+                                    {isCopied ? '¡Copiado!' : inv.code}
+                                  </button>
+                                </td>
+                                <td style={{ padding: '10px 16px', fontSize: 12, color: '#B0AA9E', whiteSpace: 'nowrap' }}>
+                                  {new Date(inv.created_at).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })}
+                                </td>
+                                <td style={{ padding: '10px 16px' }}>
+                                  {inv.used ? (
+                                    <span style={{ background: '#EAE6DF', color: '#B0AA9E', fontSize: 10, fontWeight: 500, padding: '3px 8px', borderRadius: 6 }}>
+                                      usado
+                                    </span>
+                                  ) : (
+                                    <span style={{ background: '#EAF3DE', color: '#3B6D11', fontSize: 10, fontWeight: 500, padding: '3px 8px', borderRadius: 6 }}>
+                                      disponible
+                                    </span>
+                                  )}
+                                </td>
+                              </tr>
+                            )
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
               )}
 
               {/* ── Placeholder sections ── */}
