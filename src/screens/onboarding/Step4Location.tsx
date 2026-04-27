@@ -45,6 +45,7 @@ export function Step4Location() {
     setLoading(true)
     setErrorMsg('')
     const stored = onboardingStore.get()
+    const pendingInviteCodeEarly = sessionStorage.getItem('hapInviteCode')
     try {
       const { data: profileData, error } = await supabase
         .from('profiles')
@@ -58,7 +59,12 @@ export function Step4Location() {
           trip_end_date: mode === 'local' ? null : (departure || null),
           interests: stored.interests ?? [],
           bio_question: stored.bio_question ?? '',
-          trust_score: 50,
+          mindset_answer: stored.mindset_answer ?? stored.bio_question ?? '',
+          travel_style: stored.travel_style ?? '',
+          travel_frequency: stored.travel_frequency ?? '',
+          linkedin_url: stored.linkedin_url ?? '',
+          has_invite: !!pendingInviteCodeEarly,
+          trust_score: stored.trust_score ?? 50,
           is_verified: false,
           membership_status: 'trial',
         }, { onConflict: 'user_id' })

@@ -7,6 +7,11 @@ interface OnboardingStore {
   trip_end_date: string | null
   interests: string[]
   bio_question: string
+  mindset_answer: string
+  travel_style: string
+  travel_frequency: string
+  linkedin_url: string
+  trust_score: number
 }
 
 let store: Partial<OnboardingStore> = {}

@@ -5,6 +5,9 @@ import { supabase } from '../lib/supabase'
 
 const ADMIN_USER_ID = 'aeef7b13-4e49-4c3d-a8d8-372dc5566d22'
 
+type ActiveSection = 'mindset' | 'memberships' | 'users' | 'plans' | 'connections'
+type ActiveFilter = 'todos' | 'approve' | 'review' | 'doubt'
+
 interface PendingProfile {
   id: string
   user_id: string
@@ -15,25 +18,151 @@ interface PendingProfile {
   membership_status: string
 }
 
+interface MindsetProfile {
+  id: string
+  display_name: string
+  current_city: string
+  created_at: string
+  trust_score: number
+  mindset_answer: string
+  mindset_summary: string | null
+  mindset_tags: string[] | null
+  mindset_recommendation: string | null
+}
+
+const POSITIVE_TAGS = new Set(['curioso', 'reflexivo', 'viajero real', 'growth mindset', 'empático', 'creativo'])
+const NEGATIVE_TAGS = new Set(['superficial', 'genérico', 'respuesta corta', 'copy-paste sospechoso'])
+
+function timeAgo(dateStr: string): string {
+  const diff = Date.now() - new Date(dateStr).getTime()
+  const hours = Math.floor(diff / (1000 * 60 * 60))
+  if (hours < 1) return 'hace menos de 1h'
+  if (hours < 24) return `hace ${hours}h`
+  const days = Math.floor(hours / 24)
+  return `hace ${days}d`
+}
+
+function TagChip({ tag }: { tag: string }) {
+  const isPos = POSITIVE_TAGS.has(tag)
+  const isNeg = NEGATIVE_TAGS.has(tag)
+  return (
+    <span style={{
+      background: isPos ? '#EAF3DE' : isNeg ? '#FCEBEB' : '#EAE6DF',
+      color: isPos ? '#3B6D11' : isNeg ? '#A32D2D' : '#B0AA9E',
+      fontSize: 10, fontWeight: 500,
+      padding: '2px 8px', borderRadius: 999,
+    }}>
+      {tag}
+    </span>
+  )
+}
+
+function RecBadge({ rec }: { rec: string | null }) {
+  if (!rec) return (
+    <span style={{ background: '#EAE6DF', color: '#B0AA9E', fontSize: 10, fontWeight: 500, padding: '3px 8px', borderRadius: 6 }}>
+      analizando...
+    </span>
+  )
+  const s = rec === 'approve'
+    ? { bg: '#EAF3DE', color: '#3B6D11' }
+    : rec === 'review'
+    ? { bg: '#FAEEDA', color: '#854F0B' }
+    : { bg: '#FCEBEB', color: '#A32D2D' }
+  return (
+    <span style={{ background: s.bg, color: s.color, fontSize: 10, fontWeight: 500, padding: '3px 8px', borderRadius: 6 }}>
+      {rec}
+    </span>
+  )
+}
+
+function NavItem({ label, active, onClick, badge, badgeColor }: {
+  label: string
+  active: boolean
+  onClick: () => void
+  badge?: number
+  badgeColor?: 'red' | 'blue'
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className="w-full text-left flex items-center justify-between cursor-pointer transition-all rounded-lg mb-0.5"
+      style={{
+        padding: '7px 8px',
+        background: active ? '#4A90D915' : 'transparent',
+        color: active ? '#4A90D9' : '#B0AA9E',
+        fontWeight: active ? 500 : 400,
+        fontSize: 13,
+      }}
+    >
+      <span>{label}</span>
+      {badge != null && badge > 0 && (
+        <span style={{
+          background: badgeColor === 'red' ? '#FCEBEB' : badgeColor === 'blue' ? '#E5EFFC' : '#EAE6DF',
+          color: badgeColor === 'red' ? '#A32D2D' : badgeColor === 'blue' ? '#2A60A8' : '#B0AA9E',
+          fontSize: 10, fontWeight: 600,
+          padding: '1px 7px', borderRadius: 999,
+        }}>
+          {badge}
+        </span>
+      )}
+    </button>
+  )
+}
+
+function StatCard({ label, value, sub }: { label: string; value: string; sub?: string }) {
+  return (
+    <div style={{ background: '#F5F4F1', borderRadius: 10, padding: '12px 16px' }}>
+      <p style={{ fontSize: 11, color: '#B0AA9E', fontWeight: 500, marginBottom: 4 }}>{label}</p>
+      <p style={{ fontSize: 22, color: '#1A1A1A', fontWeight: 500, lineHeight: 1 }}>{value}</p>
+      {sub && <p style={{ fontSize: 10, color: '#B0AA9E', marginTop: 3 }}>{sub}</p>}
+    </div>
+  )
+}
+
+const SECTION_META: Record<ActiveSection, { title: string; sub: string }> = {
+  mindset: { title: 'Perfiles pendientes', sub: 'usuarios sin invite · esperando revisión de mindset' },
+  memberships: { title: 'Membresías', sub: 'usuarios en período de prueba o pendientes de aprobación' },
+  users: { title: 'Usuarios', sub: 'todos los usuarios registrados en la plataforma' },
+  plans: { title: 'Planes activos', sub: 'planes activos en este momento' },
+  connections: { title: 'Conexiones', sub: 'conexiones entre usuarios' },
+}
+
 export function Admin() {
-  const navigate = useNavigate()
+  useNavigate()
   const { profile } = useAuth()
   const [profiles, setProfiles] = useState<PendingProfile[]>([])
+  const [mindsetProfiles, setMindsetProfiles] = useState<MindsetProfile[]>([])
+  const [totalUsers, setTotalUsers] = useState(0)
   const [loading, setLoading] = useState(true)
+  const [activeSection, setActiveSection] = useState<ActiveSection>('mindset')
+  const [activeFilter, setActiveFilter] = useState<ActiveFilter>('todos')
 
   const isAdmin = profile?.user_id === ADMIN_USER_ID
 
   useEffect(() => {
     if (!isAdmin) { setLoading(false); return }
-    supabase
-      .from('profiles')
-      .select('id, user_id, display_name, current_city, created_at, bio_question, membership_status')
-      .in('membership_status', ['trial', 'pending'])
-      .order('created_at', { ascending: true })
-      .then(({ data }) => {
-        setProfiles(data ?? [])
-        setLoading(false)
-      })
+    Promise.all([
+      supabase
+        .from('profiles')
+        .select('id, user_id, display_name, current_city, created_at, bio_question, membership_status')
+        .in('membership_status', ['trial', 'pending'])
+        .order('created_at', { ascending: true }),
+      supabase
+        .from('profiles')
+        .select('id, display_name, current_city, created_at, trust_score, mindset_answer, mindset_summary, mindset_tags, mindset_recommendation')
+        .eq('has_invite', false)
+        .is('mindset_approved', null)
+        .not('mindset_answer', 'is', null)
+        .order('created_at', { ascending: true }),
+      supabase
+        .from('profiles')
+        .select('id', { count: 'exact', head: true }),
+    ]).then(([res1, res2, res3]) => {
+      setProfiles(res1.data ?? [])
+      setMindsetProfiles(res2.data ?? [])
+      setTotalUsers(res3.count ?? 0)
+      setLoading(false)
+    })
   }, [isAdmin])
 
   const handleApprove = async (profileId: string) => {
@@ -46,6 +175,20 @@ export function Admin() {
     setProfiles(prev => prev.filter(p => p.id !== profileId))
   }
 
+  const handleMindsetApprove = async (profileId: string) => {
+    await supabase.from('profiles')
+      .update({ mindset_approved: true, trust_score: 60 })
+      .eq('id', profileId)
+    setMindsetProfiles(prev => prev.filter(p => p.id !== profileId))
+  }
+
+  const handleMindsetReject = async (profileId: string) => {
+    await supabase.from('profiles')
+      .update({ mindset_approved: false })
+      .eq('id', profileId)
+    setMindsetProfiles(prev => prev.filter(p => p.id !== profileId))
+  }
+
   if (!loading && !isAdmin) {
     return (
       <div className="min-h-screen bg-cream flex items-center justify-center">
@@ -54,70 +197,289 @@ export function Admin() {
     )
   }
 
-  return (
-    <div className="min-h-screen bg-cream">
-      <div className="px-4 pt-12 pb-4">
-        <button
-          onClick={() => navigate(-1)}
-          className="text-muted text-xs font-bold mb-4 cursor-pointer active:opacity-70"
-        >
-          ← Back
-        </button>
-        <h1 className="text-ink text-xl font-extrabold tracking-tight">Admin Panel</h1>
-        <p className="text-muted text-xs mt-1">Pending approvals</p>
-      </div>
+  const filteredMindset = activeFilter === 'todos'
+    ? mindsetProfiles
+    : mindsetProfiles.filter(p => p.mindset_recommendation === activeFilter)
 
-      {loading ? (
-        <div className="flex justify-center py-12">
-          <div className="w-6 h-6 border-2 border-sky border-t-transparent rounded-full animate-spin" />
+  const filters: ActiveFilter[] = ['todos', 'approve', 'review', 'doubt']
+
+  return (
+    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'row' }}>
+
+      {/* ── Sidebar ── */}
+      <aside
+        style={{ width: 200, flexShrink: 0 }}
+        className="bg-white border-r border-[#E8E4DC] flex flex-col"
+      >
+        <div className="px-5 pt-6 pb-5 border-b border-[#E8E4DC]">
+          <p className="text-ink font-extrabold tracking-tight leading-none" style={{ fontSize: 18 }}>
+            hap<span style={{ color: '#4A90D9' }}>.</span>
+          </p>
+          <p style={{ fontSize: 11, color: '#B0AA9E', marginTop: 4 }}>admin panel</p>
         </div>
-      ) : profiles.length === 0 ? (
-        <div className="px-4 py-12 text-center">
-          <p className="text-muted text-sm">No pending profiles — all clear ✓</p>
-        </div>
-      ) : (
-        <div className="px-4 flex flex-col gap-3 pb-8">
-          {profiles.map(p => (
-            <div key={p.id} className="bg-white border border-[#E8E4DC] rounded-2xl p-4">
-              <div className="flex items-start justify-between mb-2">
-                <div>
-                  <p className="text-ink font-bold text-sm">{p.display_name}</p>
-                  <p className="text-muted text-xs">{p.current_city}</p>
-                </div>
-                <div className="text-right">
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-muted">
-                    {p.membership_status}
-                  </p>
-                  <p className="text-[10px] text-muted mt-0.5">
-                    {new Date(p.created_at).toLocaleDateString('en-US', {
-                      month: 'short', day: 'numeric', year: 'numeric',
-                    })}
-                  </p>
-                </div>
-              </div>
-              {p.bio_question && (
-                <p className="text-ink text-xs leading-relaxed italic mb-3">
-                  "{p.bio_question.length > 80 ? p.bio_question.slice(0, 80) + '…' : p.bio_question}"
-                </p>
-              )}
-              <div className="flex gap-2 mt-2">
-                <button
-                  onClick={() => handleReject(p.id)}
-                  className="flex-1 bg-white border border-[#E8E4DC] rounded-xl py-2.5 text-xs font-bold text-muted active:bg-sand transition cursor-pointer"
-                >
-                  Reject
-                </button>
-                <button
-                  onClick={() => handleApprove(p.id)}
-                  className="flex-1 bg-ink rounded-xl py-2.5 text-xs font-bold text-white active:opacity-80 transition cursor-pointer"
-                >
-                  Approve
-                </button>
+
+        <nav className="flex-1 px-3 py-4">
+          <p className="text-[10px] font-bold uppercase tracking-widest text-muted px-2 mb-2">
+            REVISIÓN
+          </p>
+          <NavItem
+            label="Perfiles pendientes"
+            active={activeSection === 'mindset'}
+            onClick={() => setActiveSection('mindset')}
+            badge={mindsetProfiles.length}
+            badgeColor="red"
+          />
+          <NavItem
+            label="Membresías"
+            active={activeSection === 'memberships'}
+            onClick={() => setActiveSection('memberships')}
+            badge={profiles.length}
+            badgeColor="blue"
+          />
+
+          <p className="text-[10px] font-bold uppercase tracking-widest text-muted px-2 mb-2 mt-5">
+            DATOS
+          </p>
+          <NavItem label="Usuarios" active={activeSection === 'users'} onClick={() => setActiveSection('users')} />
+          <NavItem label="Planes activos" active={activeSection === 'plans'} onClick={() => setActiveSection('plans')} />
+          <NavItem label="Conexiones" active={activeSection === 'connections'} onClick={() => setActiveSection('connections')} />
+        </nav>
+      </aside>
+
+      {/* ── Main content ── */}
+      <main
+        style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}
+        className="bg-[#FAFAF7]"
+      >
+        {loading ? (
+          <div className="flex-1 flex items-center justify-center">
+            <div className="w-6 h-6 border-2 border-sky border-t-transparent rounded-full animate-spin" />
+          </div>
+        ) : (
+          <>
+            {/* Stats row */}
+            <div className="bg-white border-b border-[#E8E4DC] flex-shrink-0" style={{ padding: '16px 24px' }}>
+              <div className="grid grid-cols-4 gap-3">
+                <StatCard label="usuarios totales" value={totalUsers.toString()} />
+                <StatCard label="pendientes revisión" value={mindsetProfiles.length.toString()} sub="sin invite" />
+                <StatCard label="planes activos" value="—" sub="próximamente" />
+                <StatCard label="trust score promedio" value="—" sub="próximamente" />
               </div>
             </div>
-          ))}
-        </div>
-      )}
+
+            {/* Topbar */}
+            <div className="bg-white border-b border-[#E8E4DC] flex-shrink-0 flex items-center justify-between" style={{ padding: '16px 24px' }}>
+              <div>
+                <p style={{ fontSize: 15, fontWeight: 500, color: '#1A1A1A' }}>
+                  {SECTION_META[activeSection].title}
+                </p>
+                <p style={{ fontSize: 12, color: '#B0AA9E', marginTop: 2 }}>
+                  {SECTION_META[activeSection].sub}
+                </p>
+              </div>
+              {activeSection === 'mindset' && (
+                <div className="flex gap-1.5">
+                  {filters.map(f => (
+                    <button
+                      key={f}
+                      onClick={() => setActiveFilter(f)}
+                      className="cursor-pointer transition-all"
+                      style={{
+                        padding: '5px 14px',
+                        borderRadius: 999,
+                        fontSize: 12,
+                        fontWeight: 500,
+                        background: activeFilter === f ? '#1A1A1A' : 'white',
+                        color: activeFilter === f ? 'white' : '#B0AA9E',
+                        border: activeFilter === f ? '1px solid #1A1A1A' : '1px solid #E8E4DC',
+                      }}
+                    >
+                      {f}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Scrollable content */}
+            <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px' }}>
+
+              {/* ── Mindset section ── */}
+              {activeSection === 'mindset' && (
+                filteredMindset.length === 0 ? (
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh' }}>
+                    <p style={{ fontSize: 14, color: '#B0AA9E' }}>
+                      {mindsetProfiles.length === 0
+                        ? 'No hay perfiles pendientes · todo al día ✓'
+                        : 'No hay perfiles con este filtro'}
+                    </p>
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                    {filteredMindset.map(p => (
+                      <div
+                        key={p.id}
+                        className="bg-white border border-[#E8E4DC]"
+                        style={{ borderRadius: 12, padding: 16 }}
+                      >
+                        <div style={{ display: 'flex', gap: 16 }}>
+                          {/* Avatar */}
+                          <div style={{ width: 40, height: 40, borderRadius: 10, background: '#EAE6DF', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                            <span style={{ fontSize: 15, fontWeight: 500, color: '#B0AA9E' }}>
+                              {p.display_name.charAt(0).toUpperCase()}
+                            </span>
+                          </div>
+
+                          {/* Content */}
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            {/* Header */}
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
+                              <div>
+                                <p style={{ fontSize: 14, fontWeight: 500, color: '#1A1A1A', lineHeight: 1.2 }}>
+                                  {p.display_name}
+                                </p>
+                                <p style={{ fontSize: 12, color: '#B0AA9E', marginTop: 2 }}>
+                                  {p.current_city} · {timeAgo(p.created_at)}
+                                </p>
+                              </div>
+                              <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexShrink: 0 }}>
+                                <span style={{ background: '#1A1A1A', color: '#4A90D9', fontSize: 11, fontWeight: 500, padding: '3px 8px', borderRadius: 6 }}>
+                                  {p.trust_score}
+                                </span>
+                                <RecBadge rec={p.mindset_recommendation} />
+                              </div>
+                            </div>
+
+                            {/* AI summary */}
+                            {p.mindset_summary && (
+                              <p style={{ fontSize: 12, color: '#B0AA9E', fontStyle: 'italic', lineHeight: 1.5, marginBottom: 8 }}>
+                                {p.mindset_summary}
+                              </p>
+                            )}
+
+                            {/* Tags */}
+                            {p.mindset_tags && p.mindset_tags.length > 0 && (
+                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 8 }}>
+                                {p.mindset_tags.map(tag => <TagChip key={tag} tag={tag} />)}
+                              </div>
+                            )}
+
+                            {/* Mindset answer */}
+                            <div style={{ background: '#F5F4F1', borderRadius: 8, padding: '10px 12px', marginBottom: 10 }}>
+                              <p style={{ fontSize: 13, color: '#1A1A1A', lineHeight: 1.6 }}>
+                                {p.mindset_answer}
+                              </p>
+                            </div>
+
+                            {/* Actions */}
+                            <div style={{ display: 'flex', gap: 8 }}>
+                              <button
+                                onClick={() => handleMindsetReject(p.id)}
+                                className="cursor-pointer transition-all hover:bg-[#FCEBEB]"
+                                style={{ padding: '6px 14px', borderRadius: 8, fontSize: 12, fontWeight: 500, border: '1px solid #F09595', color: '#A32D2D', background: 'white' }}
+                              >
+                                ✗ Rechazar
+                              </button>
+                              <button
+                                onClick={() => handleMindsetApprove(p.id)}
+                                className="cursor-pointer transition-all hover:opacity-90"
+                                style={{ padding: '6px 14px', borderRadius: 8, fontSize: 12, fontWeight: 500, background: '#639922', color: 'white', border: 'none' }}
+                              >
+                                ✓ Aprobar
+                              </button>
+                              <button
+                                onClick={() => window.open(`/profile/${p.id}`, '_blank')}
+                                className="cursor-pointer transition-all"
+                                style={{ padding: '6px 14px', borderRadius: 8, fontSize: 12, fontWeight: 500, border: '1px solid #B5D4F4', color: '#4A90D9', background: 'white' }}
+                              >
+                                Ver perfil →
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )
+              )}
+
+              {/* ── Memberships section ── */}
+              {activeSection === 'memberships' && (
+                profiles.length === 0 ? (
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh' }}>
+                    <p style={{ fontSize: 14, color: '#B0AA9E' }}>No hay membresías pendientes ✓</p>
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                    {profiles.map(p => (
+                      <div
+                        key={p.id}
+                        className="bg-white border border-[#E8E4DC]"
+                        style={{ borderRadius: 12, padding: 16 }}
+                      >
+                        <div style={{ display: 'flex', gap: 16 }}>
+                          <div style={{ width: 40, height: 40, borderRadius: 10, background: '#EAE6DF', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                            <span style={{ fontSize: 15, fontWeight: 500, color: '#B0AA9E' }}>
+                              {p.display_name.charAt(0).toUpperCase()}
+                            </span>
+                          </div>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
+                              <div>
+                                <p style={{ fontSize: 14, fontWeight: 500, color: '#1A1A1A' }}>{p.display_name}</p>
+                                <p style={{ fontSize: 12, color: '#B0AA9E', marginTop: 2 }}>
+                                  {p.current_city} · {new Date(p.created_at).toLocaleDateString('es-ES', { month: 'short', day: 'numeric', year: 'numeric' })}
+                                </p>
+                              </div>
+                              <span style={{ background: '#EAE6DF', color: '#B0AA9E', fontSize: 10, fontWeight: 500, padding: '3px 8px', borderRadius: 6, textTransform: 'uppercase', letterSpacing: 1 }}>
+                                {p.membership_status}
+                              </span>
+                            </div>
+                            {p.bio_question && (
+                              <div style={{ background: '#F5F4F1', borderRadius: 8, padding: '10px 12px', marginBottom: 10 }}>
+                                <p style={{ fontSize: 13, color: '#1A1A1A', lineHeight: 1.6, fontStyle: 'italic' }}>
+                                  "{p.bio_question}"
+                                </p>
+                              </div>
+                            )}
+                            <div style={{ display: 'flex', gap: 8 }}>
+                              <button
+                                onClick={() => handleReject(p.id)}
+                                className="cursor-pointer transition-all hover:bg-[#FCEBEB]"
+                                style={{ padding: '6px 14px', borderRadius: 8, fontSize: 12, fontWeight: 500, border: '1px solid #F09595', color: '#A32D2D', background: 'white' }}
+                              >
+                                Rechazar
+                              </button>
+                              <button
+                                onClick={() => handleApprove(p.id)}
+                                className="cursor-pointer transition-all hover:opacity-80"
+                                style={{ padding: '6px 14px', borderRadius: 8, fontSize: 12, fontWeight: 500, background: '#1A1A1A', color: 'white', border: 'none' }}
+                              >
+                                Aprobar
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )
+              )}
+
+              {/* ── Placeholder sections ── */}
+              {(activeSection === 'users' || activeSection === 'plans' || activeSection === 'connections') && (
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '60vh', gap: 12 }}>
+                  <div style={{ width: 36, height: 36, borderRadius: '50%', border: '2px dashed #B0AA9E', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <span style={{ color: '#B0AA9E', fontSize: 14, lineHeight: 1 }}>—</span>
+                  </div>
+                  <p style={{ fontSize: 13, color: '#B0AA9E' }}>Esta sección estará disponible próximamente</p>
+                </div>
+              )}
+
+            </div>
+          </>
+        )}
+      </main>
     </div>
   )
 }

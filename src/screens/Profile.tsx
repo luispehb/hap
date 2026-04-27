@@ -8,6 +8,7 @@ import { Button } from '../components/ui/Button'
 import { BottomNav } from '../components/ui/BottomNav'
 import { getProfilePhoto, getBannerPhoto, hashString } from '../lib/photos'
 import { TrustBadge } from '../components/ui/TrustBadge'
+import { PendingApprovalBanner } from '../components/ui/PendingApprovalBanner'
 import { supabase } from '../lib/supabase'
 
 const ALL_INTERESTS = [
@@ -383,6 +384,10 @@ export function Profile() {
           <p className="text-ink font-extrabold text-xl tracking-tight">{profile.display_name}</p>
           <p className="text-muted text-xs mt-0.5">{profile.origin_city} · {profile.is_local ? 'Local' : 'Traveler'}</p>
         </div>
+      )}
+
+      {isOwnProfile && (
+        <PendingApprovalBanner profile={profile as unknown as { has_invite?: boolean; mindset_approved?: boolean | null; mindset_answer?: string | null }} />
       )}
 
       {/* Body */}
