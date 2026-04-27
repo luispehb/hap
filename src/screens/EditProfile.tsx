@@ -98,7 +98,9 @@ export function EditProfile() {
   const navigate = useNavigate()
   const { profile, user, refreshProfile } = useAuth()
 
-  const [displayName, setDisplayName] = useState(profile?.display_name ?? '')
+  const p = profile as unknown as { first_name?: string; last_name?: string }
+  const [firstName, setFirstName] = useState(p?.first_name ?? '')
+  const [lastName, setLastName] = useState(p?.last_name ?? '')
   const [originCity, setOriginCity] = useState(profile?.home_city ?? '')
   const [isLocal, setIsLocal] = useState(profile?.is_local ?? false)
   const [localCity, setLocalCity] = useState(profile?.is_local ? (profile?.current_city ?? '') : '')
@@ -147,8 +149,16 @@ export function EditProfile() {
     setErrorMsg('')
 
     const firstTrip = trips[0] ?? null
+    const first = firstName.trim()
+    const last = lastName.trim()
+    const computedDisplayName = first && last
+      ? `${first} ${last.charAt(0).toUpperCase()}.`
+      : first || profile.display_name
+
     const updates: Record<string, unknown> = {
-      display_name: displayName.trim() || profile.display_name,
+      display_name: computedDisplayName,
+      first_name: first || null,
+      last_name: last || null,
       home_city: originCity,
       is_local: isLocal,
       current_city: isLocal ? localCity : (firstTrip?.city ?? profile.current_city),
@@ -209,13 +219,30 @@ export function EditProfile() {
           <div>
             <SectionLabel>Basic info</SectionLabel>
             <div className="flex flex-col gap-2">
-              <input
-                type="text"
-                value={displayName}
-                onChange={e => setDisplayName(e.target.value)}
-                placeholder="Display name"
-                className={inputClass()}
-              />
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={firstName}
+                  onChange={e => setFirstName(e.target.value)}
+                  placeholder="First name"
+                  className={inputClass()}
+                />
+                <input
+                  type="text"
+                  value={lastName}
+                  onChange={e => setLastName(e.target.value)}
+                  placeholder="Last name"
+                  className={inputClass()}
+                />
+              </div>
+              {firstName.trim() && lastName.trim() && (
+                <p className="text-muted text-xs text-center">
+                  You'll appear as{' '}
+                  <span className="text-ink font-bold">
+                    {firstName.trim()} {lastName.trim().charAt(0).toUpperCase()}.
+                  </span>
+                </p>
+              )}
               <CityInput value={originCity} onChange={setOriginCity} placeholder="Origin city" />
             </div>
           </div>
