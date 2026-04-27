@@ -172,6 +172,7 @@ export function Admin() {
   const [loading, setLoading] = useState(true)
   const [activeSection, setActiveSection] = useState<ActiveSection>('mindset')
   const [activeFilter, setActiveFilter] = useState<ActiveFilter>('todos')
+  const [reanalyzingId, setReanalyzingId] = useState<string | null>(null)
 
   const isAdmin = profile?.user_id === ADMIN_USER_ID
 
@@ -282,19 +283,27 @@ export function Admin() {
   }
 
   const handleReanalyze = async (p: MindsetProfile) => {
-    if (!p.mindset_answer) return
-    setMindsetProfiles(prev => prev.map(x => x.id === p.id ? { ...x, mindset_recommendation: null, mindset_summary: null, mindset_tags: null } : x))
-    supabase.functions.invoke('analyze-mindset', {
-      body: { userId: p.user_id ?? p.id, mindsetAnswer: p.mindset_answer }
-    }).then(() => {
-      supabase.from('profiles')
+    if (!p.mindset_answer || reanalyzingId === p.id) return
+    setReanalyzingId(p.id)
+    try {
+      const { error: fnError } = await supabase.functions.invoke('analyze-mindset', {
+        body: { userId: p.user_id, mindsetAnswer: p.mindset_answer }
+      })
+      if (fnError) {
+        alert(`Error al re-analizar: ${fnError.message}`)
+        return
+      }
+      const { data } = await supabase
+        .from('profiles')
         .select('mindset_summary, mindset_tags, mindset_recommendation')
         .eq('id', p.id)
         .single()
-        .then(({ data }) => {
-          if (data) setMindsetProfiles(prev => prev.map(x => x.id === p.id ? { ...x, ...data } : x))
-        })
-    }).catch(console.error)
+      if (data) setMindsetProfiles(prev => prev.map(x => x.id === p.id ? { ...x, ...data } : x))
+    } catch (err) {
+      alert(`Error inesperado: ${String(err)}`)
+    } finally {
+      setReanalyzingId(null)
+    }
   }
 
   if (!loading && !isAdmin) {
@@ -518,10 +527,11 @@ export function Admin() {
                               {!p.mindset_recommendation && (
                                 <button
                                   onClick={() => handleReanalyze(p)}
-                                  className="cursor-pointer transition-all hover:opacity-80"
-                                  style={{ padding: '6px 14px', borderRadius: 8, fontSize: 12, fontWeight: 500, border: '1px solid #B0AA9E', color: '#5A554E', background: 'white' }}
+                                  disabled={reanalyzingId === p.id}
+                                  className="transition-all hover:opacity-80"
+                                  style={{ padding: '6px 14px', borderRadius: 8, fontSize: 12, fontWeight: 500, border: '1px solid #B0AA9E', color: '#5A554E', background: 'white', cursor: reanalyzingId === p.id ? 'not-allowed' : 'pointer', opacity: reanalyzingId === p.id ? 0.5 : 1 }}
                                 >
-                                  ↻ Re-analizar
+                                  {reanalyzingId === p.id ? 'Analizando...' : '↻ Re-analizar'}
                                 </button>
                               )}
                               <button
