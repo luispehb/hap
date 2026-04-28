@@ -25,11 +25,11 @@ function App() {
   return (
     <AuthProvider>
       <BrowserRouter>
-        <div className="min-h-app w-full bg-sand">
+        <div className="min-h-app w-full bg-cream sm:bg-sand">
           <Routes>
             <Route path="/admin" element={<ProtectedRoute><Admin /></ProtectedRoute>} />
             <Route path="*" element={
-              <div className="w-full max-w-[430px] mx-auto bg-cream h-app relative overflow-hidden" style={{ WebkitOverflowScrolling: 'touch', overscrollBehavior: 'none' }}>
+              <div className="w-full max-w-[430px] mx-auto bg-cream h-app relative overflow-x-hidden" style={{ WebkitOverflowScrolling: 'touch', overscrollBehavior: 'none' }}>
                 <Routes>
                   <Route path="/" element={<Splash />} />
                   <Route path="/onboarding" element={<Step1Identity />} />

@@ -457,7 +457,7 @@ export function Profile() {
   ]
 
   return (
-    <div className="min-h-screen bg-cream flex flex-col">
+    <div className="h-app bg-cream flex flex-col overflow-hidden">
 
       {isOwnProfile ? (
         /* Own profile: banner + avatar bubble */
@@ -579,7 +579,7 @@ export function Profile() {
       )}
 
       {/* Body */}
-      <div className="flex-1 overflow-y-auto pb-24 px-4 py-4 flex flex-col gap-4">
+      <div className="flex-1 min-h-0 overflow-y-auto pb-24 px-4 py-4 flex flex-col gap-4">
 
         {/* Trust score card */}
         <div className="bg-ink rounded-2xl p-4 flex items-center justify-between">

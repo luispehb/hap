@@ -27,7 +27,10 @@ export function BottomNav({ active, onNavigate }: BottomNavProps) {
   }
 
   return (
-    <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[430px] bg-cream border-t border-[#EAE6DF] z-50">
+    <div
+      className="fixed left-1/2 -translate-x-1/2 w-full max-w-[430px] bg-cream border-t border-[#EAE6DF] z-50"
+      style={{ bottom: 'calc(env(safe-area-inset-bottom, 0px) * -1)' }}
+    >
       <div className="flex pb-safe">
         {NAV_ITEMS.map(({ id, label, Icon }) => {
           const isActive = id === active
