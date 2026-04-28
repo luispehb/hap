@@ -171,7 +171,7 @@ export function Chat() {
       </div>
 
       {/* Input bar */}
-      <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[430px] bg-cream border-t border-[#E8E4DC] px-4 py-3">
+      <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[430px] bg-cream border-t border-[#E8E4DC] px-4 pt-3 pb-safe">
         <div className="flex gap-2 items-center">
           <input
             type="text"

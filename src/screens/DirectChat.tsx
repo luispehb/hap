@@ -168,8 +168,7 @@ export function DirectChat() {
 
       {/* Input */}
       <div
-        className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[430px] bg-cream border-t border-[#E8E4DC] px-4 py-3"
-        style={{ paddingBottom: 'max(12px, env(safe-area-inset-bottom))' }}
+        className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[430px] bg-cream border-t border-[#E8E4DC] px-4 pt-3 pb-safe"
       >
         <div className="flex items-center gap-2">
           <input

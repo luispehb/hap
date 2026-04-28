@@ -244,8 +244,8 @@ export function Feed() {
               <div className="flex flex-col gap-3">
                 {plans.map(plan => (
                   <button key={plan.id} onClick={() => navigate(`/plan/${plan.id}`)}
-                    className="bg-white border border-[#E8E4DC] rounded-[20px] overflow-hidden text-left cuor-pointer active:opacity-90 transition w-full">
-                    <div className="h-[100px] relative flex items-center justify-center"
+                    className="bg-white border border-[#E8E4DC] rounded-[20px] overflow-hidden text-left cuor-pointer active:opacity-90 active:scale-[0.99] transition transition-transform duration-150 w-full">
+                    <div className="h-[110px] relative flex items-center justify-center"
                       style={{ background: getActivityGradient(plan.activity_type) }}>
                       <span className="text-4xl relative z-10 mb-8">{getActivityEmoji(plan.activity_type)}</span>
                       <div className="absolute inset-0 z-20" style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.65) 0%, rgba(0,0,0,0.1) 50%, transparent 100%)' }} />
@@ -262,7 +262,7 @@ export function Feed() {
                       {plan.location_name && <p className="text-xs text-muted mb-2.5">📍 {plan.location_name}</p>}
                       <div className="flex items-center justify-between">
                         <p className="text-[10px] text-muted">Max {plan.max_participants} people</p>
-                        <span className="bg-sky text-white text-xs font-bold px-4 py-2 rounded-xl">View plan →</span>
+                        <span className="bg-ink text-white text-xs font-bold px-4 py-2 rounded-xl">View plan →</span>
                       </div>
                     </div>
                   </button>

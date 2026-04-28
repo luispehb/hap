@@ -62,13 +62,13 @@ export function ProfileCard({
   const daysLabel = getDaysLabel(profile.trip_end_date, profile.is_local)
 
   return (
-    <div className="rounded-[20px] overflow-visible" style={{ filter: 'drop-shadow(0 2px 8px rgba(0,0,0,0.08))' }}>
+    <div className="rounded-[20px] overflow-visible active:scale-[0.99] transition-transform duration-150" style={{ filter: 'drop-shadow(0 2px 8px rgba(0,0,0,0.08))' }}>
 
       {/* BANNER + AVATAR BUBBLE */}
       <div className="relative">
 
-        {/* Banner — 110px */}
-        <div className="h-[110px] w-full overflow-hidden rounded-t-[20px] relative">
+        {/* Banner — 120px */}
+        <div className="h-[120px] w-full overflow-hidden rounded-t-[20px] relative">
           <img
             src={getBannerPhoto(profile.display_name, profile.home_city)}
             alt=""
@@ -85,7 +85,7 @@ export function ProfileCard({
 
         {/* Avatar bubble — overlaps banner */}
         <div className="absolute -bottom-5 left-4 z-10">
-          <div className="w-14 h-14 rounded-2xl overflow-hidden" style={{ border: '3px solid white' }}>
+          <div className="w-[60px] h-[60px] rounded-2xl overflow-hidden" style={{ border: '3px solid white' }}>
             <img
               src={getProfilePhoto(profile.display_name, profile.home_city)}
               alt={profile.display_name}
@@ -137,15 +137,25 @@ export function ProfileCard({
           </div>
         )}
 
-        {/* Interest chips */}
+        {/* Mindset answer — 2 line clamp */}
+        {profile.bio_question && (
+          <p className="text-xs text-muted mt-2 overflow-hidden" style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+            {profile.bio_question}
+          </p>
+        )}
+
+        {/* Interest chips — max 4 visible */}
         <div className="flex gap-1.5 flex-wrap mt-2 mb-3">
-          {profile.interests.map(interest => (
+          {profile.interests.slice(0, 4).map(interest => (
             <Chip
               key={interest}
               label={interest}
               match={viewerInterests.includes(interest)}
             />
           ))}
+          {profile.interests.length > 4 && (
+            <span className="text-[11px] text-muted self-center">+{profile.interests.length - 4} more</span>
+          )}
         </div>
 
         {/* Buttons */}

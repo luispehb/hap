@@ -75,7 +75,7 @@ export function Splash() {
   }
 
   return (
-    <div className="bg-ink min-h-screen flex flex-col items-center justify-center gap-6 px-8 w-full">
+    <div className="bg-ink min-h-screen flex flex-col items-center justify-center gap-6 px-8 w-full pt-safe">
       {/* Logo */}
       <div className="flex flex-col items-center gap-2">
         <span className="text-white/30 text-xs font-bold uppercase tracking-widest">
@@ -93,7 +93,7 @@ export function Splash() {
       </div>
 
       {/* Auth options */}
-      <div className="flex flex-col gap-3 w-full mt-4">
+      <div className="flex flex-col gap-3 w-full mt-4 pb-safe">
         {/* Google */}
         <button
           onClick={handleGoogleSignIn}

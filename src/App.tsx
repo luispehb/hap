@@ -29,7 +29,7 @@ function App() {
           <Routes>
             <Route path="/admin" element={<ProtectedRoute><Admin /></ProtectedRoute>} />
             <Route path="*" element={
-              <div className="w-full max-w-[430px] mx-auto bg-cream min-h-screen relative overflow-x-hidden">
+              <div className="w-full max-w-[430px] mx-auto bg-cream min-h-screen relative overflow-x-hidden" style={{ WebkitOverflowScrolling: 'touch', overscrollBehavior: 'none' }}>
                 <Routes>
                   <Route path="/" element={<Splash />} />
                   <Route path="/onboarding" element={<Step1Identity />} />

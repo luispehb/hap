@@ -20,7 +20,7 @@ export function OnboardingLayout({ step, children }: OnboardingLayoutProps) {
   return (
     <div className="bg-cream min-h-screen max-w-[430px] mx-auto flex flex-col">
       {/* Header */}
-      <div className="flex items-center gap-4 px-4 pt-12 pb-2">
+      <div className="flex items-center gap-4 px-4 pt-safe pb-2">
         <button
           onClick={() => navigate(BACK_ROUTES[step])}
           className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-sand transition cursor-pointer flex-shrink-0"

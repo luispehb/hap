@@ -28,22 +28,22 @@ export function BottomNav({ active, onNavigate }: BottomNavProps) {
 
   return (
     <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[430px] bg-cream border-t border-[#EAE6DF] z-50">
-      <div className="flex" style={{ paddingBottom: 'max(16px, env(safe-area-inset-bottom))' }}>
+      <div className="flex pb-safe">
         {NAV_ITEMS.map(({ id, label, Icon }) => {
           const isActive = id === active
           return (
             <button
               key={id}
               onClick={() => handleTab(id)}
-              className={`flex-1 flex flex-col items-center gap-1 pt-3 pb-2 transition-colors cursor-pointer ${
+              className={`flex-1 flex flex-col items-center justify-center gap-1 pt-3 min-h-[56px] transition-colors cursor-pointer select-none ${
                 isActive ? 'text-sky' : 'text-muted'
               }`}
             >
-              {isActive && (
-                <span className="w-4 h-0.5 bg-sky rounded-full -mt-1 mb-0.5" />
-              )}
               <Icon size={18} strokeWidth={isActive ? 2.5 : 1.8} />
               <span className="text-[9px] font-bold uppercase tracking-wider">{label}</span>
+              {isActive && (
+                <span className="w-1 h-1 rounded-full bg-sky mt-0.5" />
+              )}
             </button>
           )
         })}

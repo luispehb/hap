@@ -30,6 +30,8 @@ interface MindsetProfile {
   mindset_summary: string | null
   mindset_tags: string[] | null
   mindset_recommendation: string | null
+  mindset_welcome_note: string | null
+  mindset_compatibility_score: number | null
 }
 
 type SortColumn = 'name' | 'city' | 'trust' | 'invite' | 'status' | 'date'
@@ -202,7 +204,7 @@ export function Admin() {
         .order('created_at', { ascending: true }),
       supabase
         .from('profiles')
-        .select('id, user_id, display_name, current_city, created_at, trust_score, mindset_answer, mindset_summary, mindset_tags, mindset_recommendation')
+        .select('id, user_id, display_name, current_city, created_at, trust_score, mindset_answer, mindset_summary, mindset_tags, mindset_recommendation, mindset_welcome_note, mindset_compatibility_score')
         .eq('has_invite', false)
         .is('mindset_approved', null)
         .not('mindset_answer', 'is', null)
@@ -514,6 +516,11 @@ export function Admin() {
                                   {p.trust_score}
                                 </span>
                                 <RecBadge rec={p.mindset_recommendation} />
+                                {p.mindset_compatibility_score != null && (
+                                  <span style={{ background: '#EBF4FF', color: '#4A90D9', fontSize: 10, fontWeight: 500, padding: '3px 8px', borderRadius: 6 }}>
+                                    {p.mindset_compatibility_score}% match
+                                  </span>
+                                )}
                               </div>
                             </div>
 
@@ -521,6 +528,13 @@ export function Admin() {
                             {p.mindset_summary && (
                               <p style={{ fontSize: 12, color: '#B0AA9E', fontStyle: 'italic', lineHeight: 1.5, marginBottom: 8 }}>
                                 {p.mindset_summary}
+                              </p>
+                            )}
+
+                            {/* Welcome note */}
+                            {p.mindset_welcome_note && (
+                              <p style={{ fontSize: 12, color: '#4A90D9', fontStyle: 'italic', lineHeight: 1.5, marginBottom: 8 }}>
+                                ✦ {p.mindset_welcome_note}
                               </p>
                             )}
 
