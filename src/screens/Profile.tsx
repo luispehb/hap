@@ -176,7 +176,6 @@ export function Profile() {
   const [connection, setConnection] = useState<Record<string, unknown> | null>(null)
   const [connecting, setConnecting] = useState(false)
   const [toast, setToast] = useState('')
-  const [pendingCount, setPendingCount] = useState(0)
   const [photoIndex, setPhotoIndex] = useState(0)
   const [inviteCode, setInviteCode] = useState<string | null>(null)
   const [inviteCount, setInviteCount] = useState(0)
@@ -207,17 +206,6 @@ export function Profile() {
       .maybeSingle()
       .then(({ data }) => setConnection(data))
   }, [isOwnProfile, ownProfile?.id, id])
-
-  useEffect(() => {
-    if (!isOwnProfile || !ownProfile?.id) return
-    supabase
-      .from('connections')
-      .select('id', { count: 'exact' })
-      .eq('user_b_id', ownProfile.id)
-      .eq('user_b_wants_connect', false)
-      .eq('user_a_wants_connect', true)
-      .then(({ count }) => setPendingCount(count || 0))
-  }, [isOwnProfile, ownProfile?.id])
 
   useEffect(() => {
     if (!isOwnProfile || !ownProfile?.id) return
