@@ -4,6 +4,16 @@ import './index.css'
 import App from './App.tsx'
 import { supabase } from './lib/supabase'
 
+function syncAppViewportHeight() {
+  const height = window.visualViewport?.height ?? window.innerHeight
+  document.documentElement.style.setProperty('--app-height', `${height}px`)
+}
+
+syncAppViewportHeight()
+window.addEventListener('resize', syncAppViewportHeight)
+window.visualViewport?.addEventListener('resize', syncAppViewportHeight)
+window.visualViewport?.addEventListener('scroll', syncAppViewportHeight)
+
 // Warmup agresivo: ping cada 3s hasta que Supabase responda
 function warmupSupabase() {
   let attempts = 0

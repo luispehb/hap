@@ -124,7 +124,7 @@ export function Feed() {
   ).length
 
   return (
-    <div className="min-h-app bg-cream flex flex-col">
+    <div className="h-app bg-cream flex flex-col overflow-hidden">
       {supabaseReady && error && (
         <div className="mx-4 mt-4 bg-red-50 border border-red-200 rounded-xl p-3">
           <p className="text-red-600 text-xs font-bold">Error: {error}</p>
@@ -197,7 +197,7 @@ export function Feed() {
         </div>
       )}
 
-      <div className="flex-1 px-3 mt-3 pb-24 overflow-y-auto">
+      <div className="flex-1 min-h-0 px-3 mt-3 pb-24 overflow-y-auto">
         {activeTab === 'people' && (
           <>
             {profilesLoading ? (

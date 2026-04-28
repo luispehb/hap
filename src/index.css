@@ -4,6 +4,10 @@
 @tailwind utilities;
 
 @layer base {
+  :root {
+    --app-height: 100dvh;
+  }
+
   * {
     box-sizing: border-box;
     -webkit-tap-highlight-color: transparent;
@@ -27,6 +31,7 @@
 
   #root {
     width: 100%;
+    height: var(--app-height);
     min-height: -webkit-fill-available;
     min-height: 100dvh;
     background-color: #EAE6DF;
@@ -34,6 +39,10 @@
 }
 
 @layer utilities {
+  .h-app {
+    height: var(--app-height);
+  }
+
   .min-h-app {
     min-height: -webkit-fill-available;
     min-height: 100svh;
