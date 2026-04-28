@@ -1,3 +1,4 @@
+// v2: connections tab
 import { useNavigate } from 'react-router-dom'
 import { Compass, Users, MessageCircle, User } from 'lucide-react'
 

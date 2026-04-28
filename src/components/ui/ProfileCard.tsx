@@ -62,7 +62,7 @@ export function ProfileCard({
   const daysLabel = getDaysLabel(profile.trip_end_date, profile.is_local)
 
   return (
-    <div className="rounded-[20px] overflow-visible active:scale-[0.99] transition-transform duration-150" style={{ filter: 'drop-shadow(0 2px 8px rgba(0,0,0,0.08))' }}>
+    <div onClick={onConnect} className="rounded-[20px] overflow-visible active:scale-[0.99] transition-transform duration-150 cursor-pointer" style={{ filter: 'drop-shadow(0 2px 8px rgba(0,0,0,0.08))' }}>
 
       {/* BANNER + AVATAR BUBBLE */}
       <div className="relative">
@@ -137,13 +137,6 @@ export function ProfileCard({
           </div>
         )}
 
-        {/* Mindset answer — 2 line clamp */}
-        {profile.bio_question && (
-          <p className="text-xs text-muted mt-2 overflow-hidden" style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
-            {profile.bio_question}
-          </p>
-        )}
-
         {/* Interest chips — max 4 visible */}
         <div className="flex gap-1.5 flex-wrap mt-2 mb-3">
           {profile.interests.slice(0, 4).map(interest => (
@@ -161,13 +154,13 @@ export function ProfileCard({
         {/* Buttons */}
         <div className="flex gap-2">
           <button
-            onClick={onPass}
+            onClick={e => { e.stopPropagation(); onPass() }}
             className="flex-1 py-2.5 rounded-xl text-xs font-bold border border-[#E8E4DC] text-muted bg-white active:bg-sand transition cursor-pointer"
           >
             Pass
           </button>
           <button
-            onClick={activePlan ? onJoinPlan : onConnect}
+            onClick={e => { e.stopPropagation(); activePlan ? onJoinPlan() : onConnect() }}
             className="flex-[2] py-2.5 rounded-xl text-xs font-bold bg-ink text-white active:opacity-80 transition cursor-pointer"
           >
             {activePlan ? 'Join plan' : 'Connect'}
