@@ -642,43 +642,21 @@ export function Profile() {
         {/* Stats row */}
         <StatsRow profileId={profile.id} isOwnProfile={isOwnProfile} />
 
-        {/* Journal + Connections links */}
+        {/* Journal link */}
         {isOwnProfile && (
-          <>
-            <button
-              onClick={() => navigate('/journal')}
-              className="w-full bg-white border border-[#E8E4DC] rounded-2xl p-4 flex items-center justify-between active:bg-sand transition cursor-pointer"
-            >
-              <div className="flex items-center gap-3">
-                <span className="text-xl">📖</span>
-                <div className="text-left">
-                  <p className="text-ink font-bold text-sm">Hap Journal</p>
-                  <p className="text-muted text-xs">Your travel connections</p>
-                </div>
+          <button
+            onClick={() => navigate('/journal')}
+            className="w-full bg-white border border-[#E8E4DC] rounded-2xl p-4 flex items-center justify-between active:bg-sand transition cursor-pointer"
+          >
+            <div className="flex items-center gap-3">
+              <span className="text-xl">📖</span>
+              <div className="text-left">
+                <p className="text-ink font-bold text-sm">Hap Journal</p>
+                <p className="text-muted text-xs">Your travel connections</p>
               </div>
-              <ChevronRight size={16} className="text-muted" />
-            </button>
-            <button
-              onClick={() => navigate('/connections')}
-              className="w-full bg-white border border-[#E8E4DC] rounded-2xl p-4 flex items-center justify-between active:bg-sand transition cursor-pointer"
-            >
-              <div className="flex items-center gap-3">
-                <span className="text-xl">🤝</span>
-                <div className="text-left">
-                  <p className="text-ink font-bold text-sm">Connections</p>
-                  <p className="text-muted text-xs">People you've met on Hap</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                {pendingCount > 0 && (
-                  <span className="bg-sky text-white text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center">
-                    {pendingCount}
-                  </span>
-                )}
-                <ChevronRight size={16} className="text-muted" />
-              </div>
-            </button>
-          </>
+            </div>
+            <ChevronRight size={16} className="text-muted" />
+          </button>
         )}
 
         {/* Trip card */}

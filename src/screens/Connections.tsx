@@ -4,6 +4,7 @@ import { ChevronLeft } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
 import { Button } from '../components/ui/Button'
+import { BottomNav } from '../components/ui/BottomNav'
 import { getProfilePhoto } from '../lib/photos'
 
 interface Connection {
@@ -162,7 +163,7 @@ export function Connections() {
         <p className="text-ink font-extrabold text-lg tracking-tight">Connections</p>
       </div>
 
-      <div className="px-4 py-4 flex flex-col gap-6">
+      <div className="px-4 py-4 pb-24 flex flex-col gap-6">
         {/* Pending requests */}
         {pending.length > 0 && (
           <div>
@@ -273,6 +274,8 @@ export function Connections() {
           </div>
         )}
       </div>
+
+      <BottomNav active="connections" />
     </div>
   )
 }

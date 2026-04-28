@@ -1,7 +1,7 @@
 import { useNavigate } from 'react-router-dom'
-import { Compass, CalendarDays, MessageCircle, User } from 'lucide-react'
+import { Compass, Users, MessageCircle, User } from 'lucide-react'
 
-type NavTab = 'explore' | 'plans' | 'chats' | 'profile'
+type NavTab = 'explore' | 'connections' | 'chats' | 'profile'
 
 interface BottomNavProps {
   active: NavTab
@@ -10,7 +10,7 @@ interface BottomNavProps {
 
 const NAV_ITEMS: { id: NavTab; label: string; Icon: typeof Compass }[] = [
   { id: 'explore', label: 'Explore', Icon: Compass },
-  { id: 'plans', label: 'Plans', Icon: CalendarDays },
+  { id: 'connections', label: 'Connections', Icon: Users },
   { id: 'chats', label: 'Chats', Icon: MessageCircle },
   { id: 'profile', label: 'Profile', Icon: User },
 ]
@@ -21,7 +21,7 @@ export function BottomNav({ active, onNavigate }: BottomNavProps) {
   function handleTab(tab: NavTab) {
     onNavigate?.(tab)
     if (tab === 'explore') navigate('/feed')
-    else if (tab === 'plans') navigate('/feed', { state: { tab: 'plans' } })
+    else if (tab === 'connections') navigate('/connections')
     else if (tab === 'chats') navigate('/chats')
     else if (tab === 'profile') navigate('/profile')
   }
