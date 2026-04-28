@@ -14,6 +14,7 @@
     padding: 0;
     width: 100%;
     height: 100%;
+    min-height: -webkit-fill-available;
     min-height: 100dvh;
     background-color: #EAE6DF;
     font-family: 'Inter', system-ui, sans-serif;
@@ -26,9 +27,25 @@
 
   #root {
     width: 100%;
-    min-height: 100dvh;
     min-height: -webkit-fill-available;
+    min-height: 100dvh;
     background-color: #EAE6DF;
+  }
+}
+
+@layer utilities {
+  .min-h-app {
+    min-height: -webkit-fill-available;
+    min-height: 100svh;
+    min-height: 100dvh;
+  }
+}
+
+@media (max-width: 430px) {
+  html,
+  body,
+  #root {
+    background-color: #FAFAF7;
   }
 }
 

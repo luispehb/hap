@@ -124,7 +124,7 @@ export function Feed() {
   ).length
 
   return (
-    <div className="min-h-screen bg-cream flex flex-col">
+    <div className="min-h-app bg-cream flex flex-col">
       {supabaseReady && error && (
         <div className="mx-4 mt-4 bg-red-50 border border-red-200 rounded-xl p-3">
           <p className="text-red-600 text-xs font-bold">Error: {error}</p>
@@ -274,7 +274,7 @@ export function Feed() {
       </div>
 
       <button onClick={() => navigate('/create-plan')}
-        className="fixed bo0 right-4 w-12 h-12 bg-ink rounded-2xl shadow-lg flex items-center justify-center cursor-pointer active:scale-95 transition z-40">
+        className="fixed bottom-24 right-4 w-12 h-12 bg-ink rounded-2xl shadow-lg flex items-center justify-center cursor-pointer active:scale-95 transition z-40">
         <Plus size={20} className="text-white" strokeWidth={2.5} />
       </button>
 
