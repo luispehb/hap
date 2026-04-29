@@ -45,7 +45,8 @@ function getDaysLabel(tripEndDate: string | null, isLocal: boolean): string {
   today.setHours(0, 0, 0, 0)
   end.setHours(0, 0, 0, 0)
   const days = Math.round((end.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
-  if (days <= 0) return 'Last day'
+  if (days < 0) return ''
+  if (days === 0) return 'Last day'
   if (days === 1) return '1 more day'
   return `${days} more days`
 }

@@ -45,6 +45,8 @@ describe('useProfiles', () => {
     expect(result.current.error).toBeNull()
     expect(result.current.profiles.map(profile => profile.id)).toEqual(['2', '1', '3'])
     expect(globalThis.fetch).toHaveBeenCalledOnce()
+    const requestUrl = new URL(vi.mocked(globalThis.fetch).mock.calls[0][0] as string)
+    expect(requestUrl.searchParams.get('or')).toContain('trip_end_date.gte.')
   })
 
   it('captures request failures without hanging', async () => {

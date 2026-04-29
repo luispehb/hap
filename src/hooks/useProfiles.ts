@@ -10,6 +10,14 @@ function computeAffinity(profileInterests: string[], viewerInterests: string[]):
   return Math.round((matches / viewerInterests.length) * 100)
 }
 
+function getTodayDateString(): string {
+  const today = new Date()
+  const year = today.getFullYear()
+  const month = String(today.getMonth() + 1).padStart(2, '0')
+  const day = String(today.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
 export function useProfiles(currentCity: string, viewerInterests: string[], excludeUserId?: string) {
   const [profiles, setProfiles] = useState<Profile[]>([])
   const [loading, setLoading] = useState(true)
@@ -37,6 +45,7 @@ export function useProfiles(currentCity: string, viewerInterests: string[], excl
         const params = new URLSearchParams({
           select: '*',
           current_city: `eq.${currentCity}`,
+          or: `(is_local.eq.true,trip_end_date.is.null,trip_end_date.gte.${getTodayDateString()})`,
           order: 'trust_score.desc',
         })
 

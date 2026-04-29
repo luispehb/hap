@@ -73,9 +73,19 @@ function getDaysLabel(tripEndDate: string | null, isLocal: boolean): string {
   today.setHours(0, 0, 0, 0)
   end.setHours(0, 0, 0, 0)
   const days = Math.round((end.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
-  if (days <= 0) return 'Last day'
+  if (days < 0) return 'Traveler'
+  if (days === 0) return 'Last day'
   if (days === 1) return '1 more day'
   return `${days} more days`
+}
+
+function hasExpiredTrip(profile: { is_local: boolean; trip_end_date: string | null }): boolean {
+  if (profile.is_local || !profile.trip_end_date) return false
+  const end = new Date(profile.trip_end_date)
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  end.setHours(0, 0, 0, 0)
+  return end.getTime() < today.getTime()
 }
 
 function formatTripDates(start: string | null, end: string | null): string {
@@ -170,7 +180,7 @@ export function Profile() {
 
   const fetchedProfile = useProfile(id ?? '')
 
-  const profile = isOwnProfile ? ownProfile : fetchedProfile.profile
+  let profile = isOwnProfile ? ownProfile : fetchedProfile.profile
   const loading = isOwnProfile ? false : fetchedProfile.loading
 
   const [connection, setConnection] = useState<Record<string, unknown> | null>(null)
@@ -222,10 +232,12 @@ export function Profile() {
 
   useEffect(() => {
     if (!profile?.id) return
+    const profileId = profile.id
+    const profileCurrentCity = profile.current_city
     supabase
       .from('trips')
       .select('*')
-      .eq('user_id', profile.id)
+      .eq('user_id', profileId)
       .order('arrives_at', { ascending: true })
       .then(({ data }) => {
         const loadedTrips = data ?? []
@@ -244,10 +256,10 @@ export function Profile() {
         const correctCity = activeTrip?.city ?? homeCity
 
         // Sync current_city if it drifted (trip started or ended)
-        if (correctCity && correctCity !== profile.current_city) {
+        if (correctCity && correctCity !== profileCurrentCity) {
           supabase.from('profiles')
             .update({ current_city: correctCity })
-            .eq('id', profile.id)
+            .eq('id', profileId)
             .then(() => refreshProfile())
         }
 
@@ -421,6 +433,16 @@ export function Profile() {
         <div className="w-6 h-6 border-2 border-sky border-t-transparent rounded-full animate-spin" />
       </div>
     )
+  }
+
+  if (hasExpiredTrip(profile)) {
+    profile = {
+      ...profile,
+      current_city: profile.home_city,
+      is_local: true,
+      trip_start_date: null,
+      trip_end_date: null,
+    }
   }
 
   const daysLabel = getDaysLabel(profile.trip_end_date, profile.is_local)
