@@ -237,10 +237,18 @@ export function Feed() {
                 <div className="w-6 h-6 border-2 border-sky border-t-transparent rounded-full animate-spin" />
               </div>
             ) : filteredProfiles.length === 0 ? (
-              <div className="text-center py-12">
-                <p className="text-2xl mb-2">✦</p>
-                <p className="text-ink font-bold text-sm">No one here yet</p>
-                <p className="text-muted text-xs mt-1">Be the first to create a plan</p>
+              <div className="flex flex-col items-center justify-center py-16 px-6 text-center">
+                <div className="w-16 h-16 bg-sand rounded-2xl flex items-center justify-center mb-4">
+                  <span className="text-2xl">✦</span>
+                </div>
+                <p className="text-ink font-extrabold text-base tracking-tight mb-1">No travelers here yet</p>
+                <p className="text-muted text-sm leading-relaxed">Be the first to create a plan and bring people together.</p>
+                <button
+                  onClick={() => navigate('/create-plan')}
+                  className="mt-5 bg-ink text-white text-xs font-bold px-6 py-3 rounded-xl active:opacity-80 transition cursor-pointer"
+                >
+                  + Create a plan
+                </button>
               </div>
             ) : (
               <div className="flex flex-col gap-3">
@@ -263,12 +271,16 @@ export function Feed() {
                 <div className="w-6 h-6 border-2 border-sky border-t-transparent rounded-full animate-spin" />
               </div>
             ) : plans.length === 0 ? (
-              <div className="text-center py-12">
-                <p className="text-2xl mb-2">📍</p>
-                <p className="text-ink font-bold text-sm">No active plans yet</p>
-                <p className="text-muted text-xs mt-1">Create the first one</p>
-                <button onClick={() => navigate('/create-plan')}
-                  className="mt-4 bg-ink text-white text-xs font-bold px-5 py-2 rounded-xl active:opacity-80 transition cursor-pointer">
+              <div className="flex flex-col items-center justify-center py-16 px-6 text-center">
+                <div className="w-16 h-16 bg-sand rounded-2xl flex items-center justify-center mb-4">
+                  <span className="text-2xl">📍</span>
+                </div>
+                <p className="text-ink font-extrabold text-base tracking-tight mb-1">No plans yet</p>
+                <p className="text-muted text-sm leading-relaxed">Plans are how things actually happen. Create one and see who joins.</p>
+                <button
+                  onClick={() => navigate('/create-plan')}
+                  className="mt-5 bg-sky text-white text-xs font-bold px-6 py-3 rounded-xl active:opacity-80 transition cursor-pointer"
+                >
                   + New plan
                 </button>
               </div>

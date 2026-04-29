@@ -267,10 +267,18 @@ export function Connections() {
 
         {/* Empty state */}
         {pending.length === 0 && connected.length === 0 && (
-          <div className="flex flex-col items-center justify-center py-20 gap-3">
-            <p className="text-4xl">🤝</p>
-            <p className="text-ink font-bold text-sm">No connections yet</p>
-            <p className="text-muted text-xs text-center">Meet people, make plans, connect.</p>
+          <div className="flex flex-col items-center justify-center py-16 px-6 text-center">
+            <div className="w-16 h-16 bg-sand rounded-2xl flex items-center justify-center mb-4">
+              <span className="text-2xl">🤝</span>
+            </div>
+            <p className="text-ink font-extrabold text-base tracking-tight mb-1">No connections yet</p>
+            <p className="text-muted text-sm leading-relaxed">Join a plan, meet people, and connect after. That's how it works.</p>
+            <button
+              onClick={() => navigate('/feed')}
+              className="mt-5 bg-ink text-white text-xs font-bold px-6 py-3 rounded-xl active:opacity-80 transition cursor-pointer"
+            >
+              Explore people
+            </button>
           </div>
         )}
       </div>

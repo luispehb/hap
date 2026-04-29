@@ -111,15 +111,17 @@ export function Chats() {
             <div className="w-6 h-6 border-2 border-sky border-t-transparent rounded-full animate-spin" />
           </div>
         ) : isEmpty ? (
-          <div className="flex flex-col items-center justify-center py-24 gap-3">
-            <p className="text-3xl">💬</p>
-            <p className="text-ink font-bold text-sm">No chats yet</p>
-            <p className="text-muted text-xs text-center">Join a plan or connect with someone</p>
+          <div className="flex flex-col items-center justify-center py-16 px-6 text-center">
+            <div className="w-16 h-16 bg-sand rounded-2xl flex items-center justify-center mb-4">
+              <span className="text-2xl">💬</span>
+            </div>
+            <p className="text-ink font-extrabold text-base tracking-tight mb-1">No chats yet</p>
+            <p className="text-muted text-sm leading-relaxed">Join a plan to get a group chat, or connect with someone to message them directly.</p>
             <button
               onClick={() => navigate('/feed')}
-              className="mt-2 bg-ink text-white text-xs font-bold px-5 py-2.5 rounded-xl cursor-pointer active:opacity-80 transition"
+              className="mt-5 bg-ink text-white text-xs font-bold px-6 py-3 rounded-xl active:opacity-80 transition cursor-pointer"
             >
-              Explore
+              Explore plans
             </button>
           </div>
         ) : (
