@@ -61,8 +61,7 @@ interface InviteCode {
   used: boolean
   created_at: string
   inviter_id: string
-  profiles?: { display_name: string } | null
-  used_profile?: { display_name: string } | null
+  used_by?: string | null
 }
 
 interface AdminPlan {
@@ -311,7 +310,7 @@ export function Admin() {
         .order('created_at', { ascending: false }),
       supabase
         .from('invitations')
-        .select('*, profiles!invitations_inviter_id_fkey(display_name), used_profile:profiles!invitations_used_by_fkey(display_name)')
+        .select('*')
         .order('created_at', { ascending: false }),
       supabase
         .from('plans')
@@ -368,7 +367,7 @@ export function Admin() {
     const { data } = await supabase
       .from('invitations')
       .insert({ inviter_id: user.id, code, used: false })
-      .select('*, profiles!invitations_inviter_id_fkey(display_name), used_profile:profiles!invitations_used_by_fkey(display_name)')
+      .select('*')
       .single()
     if (data) {
       setInviteCodes(prev => [data, ...prev])
@@ -1141,6 +1140,8 @@ export function Admin() {
                           {inviteCodes.map((inv, i) => {
                             const isNew = newCodeId === inv.id
                             const isCopied = copiedCode === inv.code
+                            const inviterName = allUsers.find(u => u.user_id === inv.inviter_id)?.display_name ?? '—'
+                            const usedByName = inv.used_by ? allUsers.find(u => u.id === inv.used_by)?.display_name ?? null : null
                             return (
                               <tr
                                 key={inv.id}
@@ -1164,13 +1165,13 @@ export function Admin() {
                                 </td>
                                 {/* Generado por */}
                                 <td style={{ padding: '10px 16px', fontSize: 12, color: '#1A1A1A', whiteSpace: 'nowrap' }}>
-                                  {inv.profiles?.display_name ?? '—'}
+                                  {inviterName}
                                 </td>
                                 {/* Usado por */}
                                 <td style={{ padding: '10px 16px', fontSize: 12, whiteSpace: 'nowrap' }}>
                                   {inv.used
-                                    ? inv.used_profile?.display_name
-                                      ? <span style={{ color: '#3B6D11', fontWeight: 500 }}>{inv.used_profile.display_name}</span>
+                                    ? usedByName
+                                      ? <span style={{ color: '#3B6D11', fontWeight: 500 }}>{usedByName}</span>
                                       : <span style={{ color: '#B0AA9E' }}>Usado</span>
                                     : <span style={{ color: '#B0AA9E' }}>—</span>
                                   }
