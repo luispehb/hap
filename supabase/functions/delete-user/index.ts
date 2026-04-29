@@ -92,8 +92,19 @@ serve(async (req) => {
   }
 
   const { error } = await supabase.auth.admin.deleteUser(userId)
-  if (error) {
+  if (error && error.message !== 'User not found') {
     return json({ error: 'Could not delete user', detail: error.message }, 500)
+  }
+
+  if (error?.message === 'User not found' && profile?.id) {
+    const { error: deleteProfileError } = await supabase
+      .from('profiles')
+      .delete()
+      .eq('id', profile.id)
+
+    if (deleteProfileError) {
+      return json({ error: 'Could not delete orphan profile', detail: deleteProfileError.message }, 500)
+    }
   }
 
   return json({ ok: true })
