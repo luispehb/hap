@@ -37,6 +37,7 @@ export function Feed() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null)
   const [notifCount, setNotifCount] = useState(0)
+  const [welcomeDismissed, setWelcomeDismissed] = useState(false)
 
   const viewerCity = profile?.current_city ?? ''
   const viewerInterests = profile?.interests ?? []
@@ -169,6 +170,37 @@ export function Feed() {
           </div>
         </div>
       </div>
+
+      {(() => {
+        const p = profile as typeof profile & { mindset_welcome_note?: string | null; mindset_compatibility_score?: number | null }
+        return p?.mindset_welcome_note &&
+          !welcomeDismissed &&
+          !localStorage.getItem(`hap_welcome_dismissed_${p.id}`) &&
+          (new Date().getTime() - new Date(p.created_at).getTime()) < 48 * 60 * 60 * 1000 ? (
+          <div className="mx-4 mb-3 bg-white border border-[#E8E4DC] rounded-2xl p-4">
+            <div className="flex items-start justify-between gap-2">
+              <div className="flex-1">
+                <p className="text-[10px] font-bold text-sky uppercase tracking-widest mb-1">✦ Welcome to Hap</p>
+                <p className="text-ink text-sm leading-relaxed">{p.mindset_welcome_note}</p>
+                {p.mindset_compatibility_score != null && (
+                  <span className="inline-block mt-2 bg-[#EBF4FF] text-sky text-[10px] font-bold px-2 py-0.5 rounded-full">
+                    {p.mindset_compatibility_score}% Hap match
+                  </span>
+                )}
+              </div>
+              <button
+                onClick={() => {
+                  localStorage.setItem(`hap_welcome_dismissed_${p.id}`, '1')
+                  setWelcomeDismissed(true)
+                }}
+                className="text-muted text-xs cursor-pointer active:opacity-60 flex-shrink-0"
+              >
+                ✕
+              </button>
+            </div>
+          </div>
+        ) : null
+      })()}
 
       <div className="px-4 mt-3">
         <div className="flex bg-sand rounded-xl p-1 gap-1">

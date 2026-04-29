@@ -90,7 +90,15 @@ export function Step4Location() {
         })
 
         supabase.functions.invoke('analyze-mindset', {
-          body: { userId: user.id, mindsetAnswer: stored.bio_question }
+          body: {
+            userId: user.id,
+            mindsetAnswer: stored.bio_question,
+            travelStyle: stored.travel_style ?? '',
+            travelFrequency: stored.travel_frequency ?? '',
+            interests: stored.interests ?? [],
+            hasInvite: !!(typeof window !== 'undefined' && localStorage.getItem('pendingInviteCode')),
+            linkedinUrl: stored.linkedin_url ?? '',
+          }
         }).catch(console.error)
       }
 
