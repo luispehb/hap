@@ -53,7 +53,6 @@ export function Feed() {
     return () => window.removeEventListener('beforeinstallprompt', handler)
   }, [])
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (!profile?.id) return
 
@@ -81,7 +80,24 @@ export function Feed() {
       const joinedIds = new Set((joined ?? []).map(j => j.plan_id))
       const planCount = (planData ?? []).filter(p => !joinedIds.has(p.id)).length
 
-      setNotifCount((connectionCount || 0) + planCount)
+      const { count: directUnreadCount } = await supabase
+        .from('direct_messages')
+        .select('id', { count: 'exact', head: true })
+        .eq('receiver_id', profile!.id)
+        .is('read_at', null)
+
+      let groupUnreadCount = 0
+      if (joinedIds.size > 0) {
+        const { count } = await supabase
+          .from('messages')
+          .select('id', { count: 'exact', head: true })
+          .in('plan_id', [...joinedIds])
+          .neq('sender_id', profile!.id)
+          .is('read_at', null)
+        groupUnreadCount = count || 0
+      }
+
+      setNotifCount((connectionCount || 0) + planCount + (directUnreadCount || 0) + groupUnreadCount)
     }
 
     loadNotificationCount().catch(err => {

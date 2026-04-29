@@ -52,6 +52,13 @@ export function DirectChat() {
         )
         .order('created_at', { ascending: true })
       setMessages(data ?? [])
+
+      await supabase
+        .from('direct_messages')
+        .update({ read_at: new Date().toISOString() })
+        .eq('sender_id', profileId)
+        .eq('receiver_id', ownProfile!.id)
+        .is('read_at', null)
     }
 
     loadMessages()
@@ -66,8 +73,15 @@ export function DirectChat() {
           table: 'direct_messages',
           filter: `receiver_id=eq.${ownProfile.id}`,
         },
-        (payload) => {
-          setMessages(prev => [...prev, payload.new as Message])
+        async (payload) => {
+          const incoming = payload.new as Message
+          setMessages(prev => [...prev, incoming])
+          if (incoming.sender_id === profileId) {
+            await supabase
+              .from('direct_messages')
+              .update({ read_at: new Date().toISOString() })
+              .eq('id', incoming.id)
+          }
         }
       )
       .subscribe()

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { ChevronLeft, Send } from 'lucide-react'
 import { supabase } from '../lib/supabase'
@@ -56,7 +56,7 @@ export function Chat() {
   }, [planId])
 
   // Fetch messages
-  async function fetchMessages() {
+  const fetchMessages = useCallback(async function fetchMessages() {
     if (!planId) return
     const { data } = await supabase
       .from('messages')
@@ -64,11 +64,21 @@ export function Chat() {
       .eq('plan_id', planId)
       .order('sent_at', { ascending: true })
     setMessages(data ?? [])
-  }
+
+    if (senderId) {
+      await supabase
+        .from('messages')
+        .update({ read_at: new Date().toISOString() })
+        .eq('plan_id', planId)
+        .neq('sender_id', senderId)
+        .is('read_at', null)
+    }
+  }, [planId, senderId])
 
   useEffect(() => {
-    fetchMessages()
-  }, [planId])
+    const timeout = setTimeout(() => { void fetchMessages() }, 0)
+    return () => clearTimeout(timeout)
+  }, [fetchMessages])
 
   // Realtime subscription
   useEffect(() => {
@@ -83,7 +93,7 @@ export function Chat() {
       .subscribe()
 
     return () => { supabase.removeChannel(channel) }
-  }, [planId])
+  }, [fetchMessages, planId])
 
   // Scroll to bottom on new messages
   useEffect(() => {

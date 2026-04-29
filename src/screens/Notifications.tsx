@@ -23,6 +23,24 @@ interface PlanInvite {
   activity_type: string
 }
 
+interface DirectChatNotification {
+  profile_id: string
+  display_name: string
+  home_city: string
+  last_message: string
+  last_at: string
+  unread_count: number
+}
+
+interface GroupChatNotification {
+  plan_id: string
+  plan_title: string
+  plan_city: string
+  last_message: string
+  last_at: string
+  unread_count: number
+}
+
 interface ProfileRow {
   id: string
   display_name: string
@@ -49,14 +67,18 @@ export function Notifications() {
   const [requests, setRequests] = useState<ConnectionRequest[]>([])
   const [requestProfiles, setRequestProfiles] = useState<Record<string, ProfileRow>>({})
   const [planInvites, setPlanInvites] = useState<PlanInvite[]>([])
+  const [directChats, setDirectChats] = useState<DirectChatNotification[]>([])
+  const [groupChats, setGroupChats] = useState<GroupChatNotification[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     if (authLoading) return
     if (!ownProfile?.id) {
-      setError('We could not find your profile.')
-      setLoading(false)
+      setTimeout(() => {
+        setError('We could not find your profile.')
+        setLoading(false)
+      }, 0)
       return
     }
 
@@ -93,6 +115,8 @@ export function Notifications() {
           const map: Record<string, ProfileRow> = {}
           for (const p of profileData ?? []) map[p.id] = p
           setRequestProfiles(map)
+        } else {
+          setRequestProfiles({})
         }
 
         const { data: planData, error: planError } = await supabase
@@ -126,11 +150,92 @@ export function Notifications() {
               activity_type: p.activity_type,
             }))
         )
+
+        const { data: directData, error: directError } = await supabase
+          .from('direct_messages')
+          .select('id, sender_id, content, created_at')
+          .eq('receiver_id', ownProfile!.id)
+          .is('read_at', null)
+          .order('created_at', { ascending: false })
+
+        if (directError) throw directError
+
+        const unreadDirectRows = (directData ?? []) as { sender_id: string; content: string; created_at: string }[]
+        if (unreadDirectRows.length > 0) {
+          const senderIds = [...new Set(unreadDirectRows.map(row => row.sender_id))]
+          const { data: senders, error: sendersError } = await supabase
+            .from('profiles')
+            .select('id, display_name, home_city')
+            .in('id', senderIds)
+
+          if (sendersError) throw sendersError
+
+          const sendersById = Object.fromEntries((senders ?? []).map(sender => [sender.id, sender]))
+          setDirectChats(senderIds.map(senderId => {
+            const rows = unreadDirectRows.filter(row => row.sender_id === senderId)
+            const latest = rows[0]
+            const sender = sendersById[senderId]
+            return {
+              profile_id: senderId,
+              display_name: sender?.display_name ?? 'Someone',
+              home_city: sender?.home_city ?? '',
+              last_message: latest.content,
+              last_at: latest.created_at,
+              unread_count: rows.length,
+            }
+          }))
+        } else {
+          setDirectChats([])
+        }
+
+        if (joinedIds.size > 0) {
+          const { data: groupData, error: groupError } = await supabase
+            .from('messages')
+            .select('id, plan_id, content, sent_at')
+            .in('plan_id', [...joinedIds])
+            .neq('sender_id', ownProfile!.id)
+            .is('read_at', null)
+            .order('sent_at', { ascending: false })
+
+          if (groupError) throw groupError
+
+          const unreadGroupRows = (groupData ?? []) as { plan_id: string; content: string; sent_at: string }[]
+          if (unreadGroupRows.length > 0) {
+            const unreadPlanIds = [...new Set(unreadGroupRows.map(row => row.plan_id))]
+            const { data: unreadPlans, error: unreadPlansError } = await supabase
+              .from('plans')
+              .select('id, title, city')
+              .in('id', unreadPlanIds)
+
+            if (unreadPlansError) throw unreadPlansError
+
+            const plansById = Object.fromEntries((unreadPlans ?? []).map(plan => [plan.id, plan]))
+            setGroupChats(unreadPlanIds.map(planId => {
+              const rows = unreadGroupRows.filter(row => row.plan_id === planId)
+              const latest = rows[0]
+              const plan = plansById[planId]
+              return {
+                plan_id: planId,
+                plan_title: plan?.title ?? 'Group chat',
+                plan_city: plan?.city ?? '',
+                last_message: latest.content,
+                last_at: latest.sent_at,
+                unread_count: rows.length,
+              }
+            }))
+          } else {
+            setGroupChats([])
+          }
+        } else {
+          setGroupChats([])
+        }
       } catch (err) {
         console.error('Notifications load error:', err)
         setRequests([])
         setRequestProfiles({})
         setPlanInvites([])
+        setDirectChats([])
+        setGroupChats([])
         setError(err instanceof Error ? err.message : 'Failed to load notifications.')
       } finally {
         setLoading(false)
@@ -149,7 +254,8 @@ export function Notifications() {
     setRequests(prev => prev.filter(r => r.id !== conn.id))
   }
 
-  const totalCount = requests.length + planInvites.length
+  const unreadChatCount = directChats.reduce((sum, chat) => sum + chat.unread_count, 0) + groupChats.reduce((sum, chat) => sum + chat.unread_count, 0)
+  const totalCount = requests.length + planInvites.length + unreadChatCount
   const isEmpty = totalCount === 0
 
   if (loading) {
@@ -200,6 +306,70 @@ export function Notifications() {
       </div>
 
       <div className="px-4 py-4 flex flex-col gap-6 pb-24">
+        {(directChats.length > 0 || groupChats.length > 0) && (
+          <div>
+            <p className="text-[10px] font-bold text-muted uppercase tracking-widest mb-3">
+              Unread chats
+            </p>
+            <div className="flex flex-col gap-3">
+              {directChats.map(chat => (
+                <button
+                  key={chat.profile_id}
+                  onClick={() => navigate(`/direct/${chat.profile_id}`)}
+                  className="bg-white border border-[#E8E4DC] rounded-2xl p-4 text-left w-full active:bg-sand transition cursor-pointer"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 rounded-xl overflow-hidden flex-shrink-0">
+                      <img
+                        src={getProfilePhoto(chat.display_name, chat.home_city)}
+                        alt={chat.display_name}
+                        className="w-full h-full object-cover"
+                        onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none' }}
+                      />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <p className="text-ink font-bold text-sm truncate">{chat.display_name}</p>
+                        <span className="bg-sky text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
+                          {chat.unread_count}
+                        </span>
+                      </div>
+                      <p className="text-muted text-xs truncate mt-0.5">{chat.last_message}</p>
+                      <p className="text-muted text-[10px] mt-0.5">{timeAgo(chat.last_at)}</p>
+                    </div>
+                  </div>
+                </button>
+              ))}
+
+              {groupChats.map(chat => (
+                <button
+                  key={chat.plan_id}
+                  onClick={() => navigate(`/chat/${chat.plan_id}`)}
+                  className="bg-white border border-[#E8E4DC] rounded-2xl p-4 text-left w-full active:bg-sand transition cursor-pointer"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <p className="text-ink font-bold text-sm truncate">{chat.plan_title}</p>
+                        <span className="bg-sky text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
+                          {chat.unread_count}
+                        </span>
+                      </div>
+                      <p className="text-muted text-xs truncate mt-0.5">{chat.last_message}</p>
+                      <p className="text-muted text-[10px] mt-0.5">
+                        {chat.plan_city} · {timeAgo(chat.last_at)}
+                      </p>
+                    </div>
+                    <span className="text-[10px] font-bold text-sky bg-[#EBF4FF] px-2.5 py-1 rounded-full whitespace-nowrap">
+                      Group
+                    </span>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         {requests.length > 0 && (
           <div>
             <p className="text-[10px] font-bold text-muted uppercase tracking-widest mb-3">
