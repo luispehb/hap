@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { FunctionsHttpError } from '@supabase/supabase-js'
 import { useAuth } from '../contexts/AuthContext'
@@ -6,7 +6,7 @@ import { supabase } from '../lib/supabase'
 
 const ADMIN_USER_ID = 'aeef7b13-4e49-4c3d-a8d8-372dc5566d22'
 
-type ActiveSection = 'mindset' | 'memberships' | 'users' | 'plans' | 'connections' | 'invites'
+type ActiveSection = 'overview' | 'mindset' | 'memberships' | 'users' | 'plans' | 'connections' | 'invites'
 type ActiveFilter = 'todos' | 'approve' | 'review' | 'doubt'
 
 interface PendingProfile {
@@ -46,9 +46,13 @@ interface UserProfile {
   trust_score: number
   has_invite: boolean
   mindset_approved: boolean | null
+  membership_status: string
   created_at: string
   travel_style: string | null
   email: string | null
+  home_city: string | null
+  is_local: boolean | null
+  trip_end_date: string | null
 }
 
 interface InviteCode {
@@ -57,6 +61,37 @@ interface InviteCode {
   used: boolean
   created_at: string
   inviter_id: string
+}
+
+interface AdminPlan {
+  id: string
+  creator_id: string
+  title: string
+  activity_type: string
+  city: string
+  location_name: string | null
+  scheduled_at: string
+  max_participants: number
+  status: string
+  is_hap_day: boolean
+  created_at: string
+}
+
+interface AdminParticipant {
+  plan_id: string
+  user_id: string
+  status: string
+}
+
+interface AdminConnection {
+  id: string
+  user_a_id: string
+  user_b_id: string
+  plan_id: string | null
+  user_a_wants_connect: boolean
+  user_b_wants_connect: boolean
+  social_shared: boolean
+  connected_at: string
 }
 
 const POSITIVE_TAGS = new Set(['curioso', 'reflexivo', 'viajero real', 'growth mindset', 'empático', 'creativo'])
@@ -69,6 +104,24 @@ function timeAgo(dateStr: string): string {
   if (hours < 24) return `hace ${hours}h`
   const days = Math.floor(hours / 24)
   return `hace ${days}d`
+}
+
+function formatShortDate(dateStr: string): string {
+  return new Date(dateStr).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })
+}
+
+function formatDateTime(dateStr: string): string {
+  return new Date(dateStr).toLocaleString('es-ES', {
+    day: 'numeric',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
+function pct(value: number, total: number): string {
+  if (total === 0) return '0%'
+  return `${Math.round((value / total) * 100)}%`
 }
 
 async function getFunctionErrorMessage(error: unknown): Promise<string> {
@@ -163,13 +216,42 @@ function StatCard({ label, value, sub }: { label: string; value: string; sub?: s
   )
 }
 
+function OpsCard({ title, value, sub, tone = 'neutral' }: { title: string; value: string; sub?: string; tone?: 'neutral' | 'good' | 'warn' | 'bad' | 'blue' }) {
+  const color = tone === 'good' ? '#3B6D11' : tone === 'warn' ? '#854F0B' : tone === 'bad' ? '#A32D2D' : tone === 'blue' ? '#2A60A8' : '#1A1A1A'
+  const bg = tone === 'good' ? '#F3F8EC' : tone === 'warn' ? '#FFF7E8' : tone === 'bad' ? '#FFF1F1' : tone === 'blue' ? '#EFF6FF' : '#F5F4F1'
+  return (
+    <div className="bg-white border border-[#E8E4DC]" style={{ borderRadius: 12, padding: 16 }}>
+      <p style={{ fontSize: 11, color: '#B0AA9E', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 10 }}>{title}</p>
+      <div style={{ display: 'inline-flex', alignItems: 'baseline', gap: 8, background: bg, borderRadius: 10, padding: '8px 12px' }}>
+        <span style={{ color, fontSize: 26, fontWeight: 800, lineHeight: 1 }}>{value}</span>
+      </div>
+      {sub && <p style={{ fontSize: 12, color: '#6F695F', marginTop: 10, lineHeight: 1.45 }}>{sub}</p>}
+    </div>
+  )
+}
+
+function Panel({ title, sub, children }: { title: string; sub?: string; children: ReactNode }) {
+  return (
+    <section className="bg-white border border-[#E8E4DC]" style={{ borderRadius: 12, overflow: 'hidden' }}>
+      <div style={{ padding: '14px 16px', borderBottom: '1px solid #E8E4DC' }}>
+        <p style={{ fontSize: 14, fontWeight: 700, color: '#1A1A1A' }}>{title}</p>
+        {sub && <p style={{ fontSize: 12, color: '#B0AA9E', marginTop: 2 }}>{sub}</p>}
+      </div>
+      <div style={{ padding: 16 }}>
+        {children}
+      </div>
+    </section>
+  )
+}
+
 const SECTION_META: Record<ActiveSection, { title: string; sub: string }> = {
+  overview: { title: 'Operations overview', sub: 'lo que necesita atención para operar el MVP hoy' },
   mindset: { title: 'Perfiles pendientes', sub: 'usuarios sin invite · esperando revisión de mindset' },
   memberships: { title: 'Membresías', sub: 'usuarios en período de prueba o pendientes de aprobación' },
   users: { title: 'Usuarios', sub: 'todos los usuarios registrados en la plataforma' },
-  plans: { title: 'Planes activos', sub: 'planes activos en este momento' },
-  connections: { title: 'Conexiones', sub: 'conexiones entre usuarios' },
-  invites: { title: 'Invite codes', sub: 'códigos de invitación generados' },
+  plans: { title: 'Planes', sub: 'supply, ocupación y próximos encuentros' },
+  connections: { title: 'Conexiones', sub: 'señales de matching, dobles opt-in y social sharing' },
+  invites: { title: 'Invite codes', sub: 'códigos disponibles, usados y crecimiento por invitación' },
 }
 
 export function Admin() {
@@ -179,6 +261,11 @@ export function Admin() {
   const [mindsetProfiles, setMindsetProfiles] = useState<MindsetProfile[]>([])
   const [allUsers, setAllUsers] = useState<UserProfile[]>([])
   const [totalUsers, setTotalUsers] = useState(0)
+  const [plans, setPlans] = useState<AdminPlan[]>([])
+  const [participants, setParticipants] = useState<AdminParticipant[]>([])
+  const [connections, setConnections] = useState<AdminConnection[]>([])
+  const [messageCount, setMessageCount] = useState(0)
+  const [ratingCount, setRatingCount] = useState(0)
   const [editingUserId, setEditingUserId] = useState<string | null>(null)
   const [editValues, setEditValues] = useState<{ trust_score: number; current_city: string; mindset_approved: boolean | null }>({ trust_score: 0, current_city: '', mindset_approved: null })
   const [inviteCodes, setInviteCodes] = useState<InviteCode[]>([])
@@ -188,14 +275,18 @@ export function Admin() {
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
   const [searchQuery, setSearchQuery] = useState('')
   const [loading, setLoading] = useState(true)
-  const [activeSection, setActiveSection] = useState<ActiveSection>('mindset')
+  const [activeSection, setActiveSection] = useState<ActiveSection>('overview')
   const [activeFilter, setActiveFilter] = useState<ActiveFilter>('todos')
   const [reanalyzingId, setReanalyzingId] = useState<string | null>(null)
+  const [now] = useState(() => Date.now())
 
   const isAdmin = profile?.user_id === ADMIN_USER_ID
 
   useEffect(() => {
-    if (!isAdmin) { setLoading(false); return }
+    if (!isAdmin) {
+      setTimeout(() => setLoading(false), 0)
+      return
+    }
     Promise.all([
       supabase
         .from('profiles')
@@ -214,18 +305,40 @@ export function Admin() {
         .select('id', { count: 'exact', head: true }),
       supabase
         .from('profiles')
-        .select('id, user_id, display_name, first_name, last_name, current_city, trust_score, has_invite, mindset_approved, created_at, travel_style, email')
+        .select('id, user_id, display_name, first_name, last_name, current_city, trust_score, has_invite, mindset_approved, membership_status, created_at, travel_style, email, home_city, is_local, trip_end_date')
         .order('created_at', { ascending: false }),
       supabase
         .from('invitations')
         .select('*')
         .order('created_at', { ascending: false }),
-    ]).then(([res1, res2, res3, res4, res5]) => {
+      supabase
+        .from('plans')
+        .select('id, creator_id, title, activity_type, city, location_name, scheduled_at, max_participants, status, is_hap_day, created_at')
+        .order('scheduled_at', { ascending: true }),
+      supabase
+        .from('plan_participants')
+        .select('plan_id, user_id, status'),
+      supabase
+        .from('connections')
+        .select('id, user_a_id, user_b_id, plan_id, user_a_wants_connect, user_b_wants_connect, social_shared, connected_at')
+        .order('connected_at', { ascending: false }),
+      supabase
+        .from('messages')
+        .select('id', { count: 'exact', head: true }),
+      supabase
+        .from('ratings')
+        .select('id', { count: 'exact', head: true }),
+    ]).then(([res1, res2, res3, res4, res5, res6, res7, res8, res9, res10]) => {
       setProfiles(res1.data ?? [])
       setMindsetProfiles(res2.data ?? [])
       setTotalUsers(res3.count ?? 0)
       setAllUsers(res4.data ?? [])
       setInviteCodes(res5.data ?? [])
+      setPlans(res6.data ?? [])
+      setParticipants(res7.data ?? [])
+      setConnections(res8.data ?? [])
+      setMessageCount(res9.count ?? 0)
+      setRatingCount(res10.count ?? 0)
       setLoading(false)
     })
   }, [isAdmin])
@@ -324,14 +437,6 @@ export function Admin() {
     }
   }
 
-  if (!loading && !isAdmin) {
-    return (
-      <div className="min-h-screen bg-cream flex items-center justify-center">
-        <p className="text-ink font-bold">Access denied</p>
-      </div>
-    )
-  }
-
   const processedUsers = useMemo(() => {
     let list = [...allUsers]
     if (searchQuery.trim()) {
@@ -360,6 +465,70 @@ export function Admin() {
     return list
   }, [allUsers, searchQuery, sortColumn, sortDir])
 
+  const participantsByPlan = useMemo(() => {
+    return participants.reduce<Record<string, AdminParticipant[]>>((acc, participant) => {
+      acc[participant.plan_id] = acc[participant.plan_id] ?? []
+      acc[participant.plan_id].push(participant)
+      return acc
+    }, {})
+  }, [participants])
+
+  const userById = useMemo(() => {
+    return Object.fromEntries(allUsers.map(u => [u.id, u]))
+  }, [allUsers])
+
+  const activePlans = useMemo(() => (
+    plans.filter(plan => plan.status !== 'cancelled' && new Date(plan.scheduled_at).getTime() >= now)
+  ), [now, plans])
+  const nextPlans = activePlans.slice(0, 6)
+  const openCapacity = activePlans.reduce((sum, plan) => {
+    const joined = (participantsByPlan[plan.id] ?? []).filter(p => p.status !== 'cancelled').length
+    return sum + Math.max(plan.max_participants - joined, 0)
+  }, 0)
+  const filledSeats = activePlans.reduce((sum, plan) => sum + (participantsByPlan[plan.id] ?? []).filter(p => p.status !== 'cancelled').length, 0)
+  const totalSeats = activePlans.reduce((sum, plan) => sum + plan.max_participants, 0)
+  const avgTrust = allUsers.length > 0 ? Math.round(allUsers.reduce((sum, u) => sum + (u.trust_score ?? 0), 0) / allUsers.length) : 0
+  const approvedUsers = allUsers.filter(u => u.mindset_approved === true).length
+  const invitedUsers = allUsers.filter(u => u.has_invite).length
+  const activeMembers = allUsers.filter(u => u.membership_status === 'active').length
+  const pendingUsers = allUsers.filter(u => u.mindset_approved === null || ['trial', 'pending'].includes(u.membership_status)).length
+  const usedInvites = inviteCodes.filter(inv => inv.used).length
+  const availableInvites = inviteCodes.length - usedInvites
+  const mutualConnections = connections.filter(c => c.user_a_wants_connect && c.user_b_wants_connect).length
+  const oneWayConnections = connections.filter(c => c.user_a_wants_connect !== c.user_b_wants_connect).length
+  const socialSharedConnections = connections.filter(c => c.social_shared).length
+
+  const cityOps = useMemo(() => {
+    const cities = new Map<string, {
+      city: string
+      users: number
+      travelers: number
+      locals: number
+      pending: number
+      plans: number
+      seats: number
+    }>()
+
+    allUsers.forEach(userProfile => {
+      const city = userProfile.current_city || 'Sin ciudad'
+      const row = cities.get(city) ?? { city, users: 0, travelers: 0, locals: 0, pending: 0, plans: 0, seats: 0 }
+      row.users += 1
+      if (userProfile.is_local) row.locals += 1
+      else row.travelers += 1
+      if (userProfile.mindset_approved === null || ['trial', 'pending'].includes(userProfile.membership_status)) row.pending += 1
+      cities.set(city, row)
+    })
+
+    activePlans.forEach(plan => {
+      const row = cities.get(plan.city) ?? { city: plan.city, users: 0, travelers: 0, locals: 0, pending: 0, plans: 0, seats: 0 }
+      row.plans += 1
+      row.seats += Math.max(plan.max_participants - ((participantsByPlan[plan.id] ?? []).filter(p => p.status !== 'cancelled').length), 0)
+      cities.set(plan.city, row)
+    })
+
+    return [...cities.values()].sort((a, b) => (b.pending + b.users + b.plans) - (a.pending + a.users + a.plans)).slice(0, 6)
+  }, [activePlans, allUsers, participantsByPlan])
+
   function toggleSort(col: SortColumn) {
     if (sortColumn === col) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
     else { setSortColumn(col); setSortDir('asc') }
@@ -370,6 +539,14 @@ export function Admin() {
     : mindsetProfiles.filter(p => p.mindset_recommendation === activeFilter)
 
   const filters: ActiveFilter[] = ['todos', 'approve', 'review', 'doubt']
+
+  if (!loading && !isAdmin) {
+    return (
+      <div className="min-h-screen bg-cream flex items-center justify-center">
+        <p className="text-ink font-bold">Access denied</p>
+      </div>
+    )
+  }
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', width: '100%', background: '#EAE6DF' }}>
@@ -388,6 +565,17 @@ export function Admin() {
 
         <nav className="flex-1 px-3 py-4">
           <p className="text-[10px] font-bold uppercase tracking-widest text-muted px-2 mb-2">
+            OPERACIÓN
+          </p>
+          <NavItem
+            label="Overview"
+            active={activeSection === 'overview'}
+            onClick={() => setActiveSection('overview')}
+            badge={pendingUsers}
+            badgeColor={pendingUsers > 0 ? 'red' : 'blue'}
+          />
+
+          <p className="text-[10px] font-bold uppercase tracking-widest text-muted px-2 mb-2 mt-5">
             REVISIÓN
           </p>
           <NavItem
@@ -429,10 +617,10 @@ export function Admin() {
             {/* Stats row */}
             <div className="bg-white border-b border-[#E8E4DC] flex-shrink-0" style={{ padding: '16px 24px' }}>
               <div className="grid grid-cols-4 gap-3">
-                <StatCard label="usuarios totales" value={totalUsers.toString()} />
-                <StatCard label="pendientes revisión" value={mindsetProfiles.length.toString()} sub="sin invite" />
-                <StatCard label="planes activos" value="—" sub="próximamente" />
-                <StatCard label="trust score promedio" value="—" sub="próximamente" />
+                <StatCard label="usuarios totales" value={totalUsers.toString()} sub={`${activeMembers} activos · ${approvedUsers} aprobados · ${invitedUsers} con invite`} />
+                <StatCard label="pendientes revisión" value={pendingUsers.toString()} sub={`${mindsetProfiles.length} mindset · ${profiles.length} membresía`} />
+                <StatCard label="planes próximos" value={activePlans.length.toString()} sub={`${openCapacity} cupos abiertos · ${pct(filledSeats, totalSeats)} ocupación`} />
+                <StatCard label="trust score promedio" value={avgTrust.toString()} sub={`${mutualConnections} conexiones mutuas`} />
               </div>
             </div>
 
@@ -472,6 +660,103 @@ export function Admin() {
 
             {/* Scrollable content */}
             <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px' }}>
+
+              {/* ── Overview section ── */}
+              {activeSection === 'overview' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                  <div className="grid grid-cols-4 gap-3">
+                    <OpsCard
+                      title="Admisión"
+                      value={pendingUsers.toString()}
+                      sub={`${mindsetProfiles.length} mindset por revisar, ${profiles.length} membresías trial/pending`}
+                      tone={pendingUsers > 0 ? 'warn' : 'good'}
+                    />
+                    <OpsCard
+                      title="Supply"
+                      value={activePlans.length.toString()}
+                      sub={`${openCapacity} cupos disponibles en los próximos planes`}
+                      tone={activePlans.length > 0 ? 'blue' : 'warn'}
+                    />
+                    <OpsCard
+                      title="Matching"
+                      value={mutualConnections.toString()}
+                      sub={`${oneWayConnections} señales one-way, ${socialSharedConnections} con social compartido`}
+                      tone={mutualConnections > 0 ? 'good' : 'neutral'}
+                    />
+                    <OpsCard
+                      title="Invites"
+                      value={availableInvites.toString()}
+                      sub={`${usedInvites}/${inviteCodes.length} usados · ${pct(usedInvites, inviteCodes.length)} conversión`}
+                      tone={availableInvites < 3 ? 'warn' : 'good'}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <Panel title="Prioridades de hoy" sub="atajos para mantener el MVP sano">
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                        {[
+                          { label: 'Revisar mindset sin invite', value: mindsetProfiles.length, target: 'mindset' as ActiveSection, tone: mindsetProfiles.length > 0 ? '#854F0B' : '#3B6D11' },
+                          { label: 'Resolver membresías trial/pending', value: profiles.length, target: 'memberships' as ActiveSection, tone: profiles.length > 0 ? '#854F0B' : '#3B6D11' },
+                          { label: 'Crear supply donde falten cupos', value: cityOps.filter(c => c.users > 0 && c.plans === 0).length, target: 'plans' as ActiveSection, tone: cityOps.some(c => c.users > 0 && c.plans === 0) ? '#A32D2D' : '#3B6D11' },
+                          { label: 'Revisar conexiones one-way', value: oneWayConnections, target: 'connections' as ActiveSection, tone: oneWayConnections > 0 ? '#2A60A8' : '#3B6D11' },
+                        ].map(item => (
+                          <button
+                            key={item.label}
+                            onClick={() => setActiveSection(item.target)}
+                            className="cursor-pointer transition-all hover:bg-[#FAFAF7]"
+                            style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 12px', border: '1px solid #E8E4DC', borderRadius: 10, background: 'white', textAlign: 'left' }}
+                          >
+                            <span style={{ fontSize: 13, color: '#1A1A1A', fontWeight: 600 }}>{item.label}</span>
+                            <span style={{ minWidth: 26, textAlign: 'center', fontSize: 12, color: item.tone, fontWeight: 800, background: '#F5F4F1', borderRadius: 999, padding: '3px 8px' }}>{item.value}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </Panel>
+
+                    <Panel title="Salud por ciudad" sub="demanda, supply y backlog">
+                      {cityOps.length === 0 ? (
+                        <p style={{ fontSize: 13, color: '#B0AA9E' }}>Aún no hay actividad por ciudad.</p>
+                      ) : (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                          {cityOps.map(city => (
+                            <div key={city.city} style={{ display: 'grid', gridTemplateColumns: '1fr auto auto auto', gap: 12, alignItems: 'center', paddingBottom: 10, borderBottom: '1px solid #F0EDE8' }}>
+                              <div>
+                                <p style={{ fontSize: 13, color: '#1A1A1A', fontWeight: 700 }}>{city.city}</p>
+                                <p style={{ fontSize: 11, color: '#B0AA9E', marginTop: 1 }}>{city.travelers} travelers · {city.locals} locals</p>
+                              </div>
+                              <span style={{ fontSize: 12, color: '#2A60A8', fontWeight: 700 }}>{city.plans} planes</span>
+                              <span style={{ fontSize: 12, color: '#3B6D11', fontWeight: 700 }}>{city.seats} cupos</span>
+                              <span style={{ fontSize: 12, color: city.pending > 0 ? '#854F0B' : '#B0AA9E', fontWeight: 700 }}>{city.pending} pendientes</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </Panel>
+                  </div>
+
+                  <Panel title="Próximos planes" sub="lo más cercano en la operación">
+                    {nextPlans.length === 0 ? (
+                      <p style={{ fontSize: 13, color: '#B0AA9E' }}>No hay planes próximos. Es momento de crear o empujar supply.</p>
+                    ) : (
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 12 }}>
+                        {nextPlans.map(plan => {
+                          const joined = (participantsByPlan[plan.id] ?? []).filter(p => p.status !== 'cancelled').length
+                          return (
+                            <div key={plan.id} style={{ border: '1px solid #E8E4DC', borderRadius: 10, padding: 12, background: '#FAFAF7' }}>
+                              <p style={{ fontSize: 13, color: '#1A1A1A', fontWeight: 800, lineHeight: 1.25 }}>{plan.title}</p>
+                              <p style={{ fontSize: 11, color: '#B0AA9E', marginTop: 5 }}>{plan.city} · {formatDateTime(plan.scheduled_at)}</p>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 10, fontSize: 11, color: '#6F695F' }}>
+                                <span>{joined}/{plan.max_participants} joined</span>
+                                <span>{plan.status}</span>
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )}
+                  </Panel>
+                </div>
+              )}
 
               {/* ── Mindset section ── */}
               {activeSection === 'mindset' && (
@@ -888,13 +1173,123 @@ export function Admin() {
                 </div>
               )}
 
-              {/* ── Placeholder sections ── */}
-              {(activeSection === 'plans' || activeSection === 'connections') && (
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '60vh', gap: 12 }}>
-                  <div style={{ width: 36, height: 36, borderRadius: '50%', border: '2px dashed #B0AA9E', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <span style={{ color: '#B0AA9E', fontSize: 14, lineHeight: 1 }}>—</span>
+              {/* ── Plans section ── */}
+              {activeSection === 'plans' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                  <div className="grid grid-cols-4 gap-3">
+                    <OpsCard title="Próximos" value={activePlans.length.toString()} sub={`${plans.length} planes totales`} tone="blue" />
+                    <OpsCard title="Ocupación" value={pct(filledSeats, totalSeats)} sub={`${filledSeats}/${totalSeats} cupos tomados`} tone={filledSeats > 0 ? 'good' : 'warn'} />
+                    <OpsCard title="Cupos abiertos" value={openCapacity.toString()} sub="capacidad disponible para empujar matching" tone={openCapacity > 0 ? 'good' : 'warn'} />
+                    <OpsCard title="Hap days" value={activePlans.filter(plan => plan.is_hap_day).length.toString()} sub="planes destacados próximos" tone="neutral" />
                   </div>
-                  <p style={{ fontSize: 13, color: '#B0AA9E' }}>Esta sección estará disponible próximamente</p>
+
+                  {plans.length === 0 ? (
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '40vh' }}>
+                      <p style={{ fontSize: 14, color: '#B0AA9E' }}>No hay planes creados todavía</p>
+                    </div>
+                  ) : (
+                    <div className="bg-white border border-[#E8E4DC]" style={{ borderRadius: 12, overflow: 'hidden' }}>
+                      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                        <thead>
+                          <tr style={{ borderBottom: '1px solid #E8E4DC' }}>
+                            {['Plan', 'Ciudad', 'Fecha', 'Ocupación', 'Estado', 'Creator'].map(col => (
+                              <th key={col} style={{ padding: '10px 16px', textAlign: 'left', fontSize: 11, fontWeight: 600, color: '#B0AA9E', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{col}</th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {plans.map((plan, i) => {
+                            const joined = (participantsByPlan[plan.id] ?? []).filter(p => p.status !== 'cancelled').length
+                            const creator = userById[plan.creator_id]
+                            const isPast = new Date(plan.scheduled_at).getTime() < now
+                            return (
+                              <tr key={plan.id} style={{ background: i % 2 === 0 ? 'white' : '#FAFAF7', borderBottom: i < plans.length - 1 ? '1px solid #F0EDE8' : 'none' }}>
+                                <td style={{ padding: '10px 16px' }}>
+                                  <p style={{ fontSize: 13, fontWeight: 700, color: '#1A1A1A' }}>{plan.title}</p>
+                                  <p style={{ fontSize: 11, color: '#B0AA9E', marginTop: 1 }}>{plan.activity_type}{plan.location_name ? ` · ${plan.location_name}` : ''}</p>
+                                </td>
+                                <td style={{ padding: '10px 16px', fontSize: 13, color: '#1A1A1A', whiteSpace: 'nowrap' }}>{plan.city}</td>
+                                <td style={{ padding: '10px 16px', fontSize: 12, color: isPast ? '#B0AA9E' : '#1A1A1A', whiteSpace: 'nowrap' }}>{formatDateTime(plan.scheduled_at)}</td>
+                                <td style={{ padding: '10px 16px' }}>
+                                  <span style={{ background: joined >= plan.max_participants ? '#EAF3DE' : '#EFF6FF', color: joined >= plan.max_participants ? '#3B6D11' : '#2A60A8', fontSize: 12, fontWeight: 700, padding: '3px 10px', borderRadius: 6 }}>
+                                    {joined}/{plan.max_participants}
+                                  </span>
+                                </td>
+                                <td style={{ padding: '10px 16px' }}>
+                                  <span style={{ background: isPast ? '#EAE6DF' : plan.status === 'open' ? '#EAF3DE' : '#FAEEDA', color: isPast ? '#B0AA9E' : plan.status === 'open' ? '#3B6D11' : '#854F0B', fontSize: 10, fontWeight: 600, padding: '3px 8px', borderRadius: 6 }}>
+                                    {isPast ? 'past' : plan.status}
+                                  </span>
+                                </td>
+                                <td style={{ padding: '10px 16px', fontSize: 12, color: '#6F695F' }}>{creator?.display_name ?? '—'}</td>
+                              </tr>
+                            )
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* ── Connections section ── */}
+              {activeSection === 'connections' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                  <div className="grid grid-cols-4 gap-3">
+                    <OpsCard title="Total señales" value={connections.length.toString()} sub="todas las conexiones registradas" tone="neutral" />
+                    <OpsCard title="Mutuas" value={mutualConnections.toString()} sub={`${pct(mutualConnections, connections.length)} doble opt-in`} tone={mutualConnections > 0 ? 'good' : 'warn'} />
+                    <OpsCard title="One-way" value={oneWayConnections.toString()} sub="potencial para nudges o notificaciones" tone={oneWayConnections > 0 ? 'blue' : 'neutral'} />
+                    <OpsCard title="Social shared" value={socialSharedConnections.toString()} sub={`${pct(socialSharedConnections, mutualConnections)} de conexiones mutuas`} tone={socialSharedConnections > 0 ? 'good' : 'neutral'} />
+                  </div>
+
+                  <Panel title="Engagement" sub="mensajes y ratings como señales de calidad">
+                    <div className="grid grid-cols-3 gap-3">
+                      <StatCard label="mensajes enviados" value={messageCount.toString()} />
+                      <StatCard label="ratings recibidos" value={ratingCount.toString()} />
+                      <StatCard label="mensajes / conexión" value={connections.length > 0 ? (messageCount / connections.length).toFixed(1) : '0'} />
+                    </div>
+                  </Panel>
+
+                  {connections.length === 0 ? (
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '40vh' }}>
+                      <p style={{ fontSize: 14, color: '#B0AA9E' }}>Aún no hay señales de conexión</p>
+                    </div>
+                  ) : (
+                    <div className="bg-white border border-[#E8E4DC]" style={{ borderRadius: 12, overflow: 'hidden' }}>
+                      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                        <thead>
+                          <tr style={{ borderBottom: '1px solid #E8E4DC' }}>
+                            {['Usuarios', 'Tipo', 'Plan', 'Social', 'Fecha'].map(col => (
+                              <th key={col} style={{ padding: '10px 16px', textAlign: 'left', fontSize: 11, fontWeight: 600, color: '#B0AA9E', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{col}</th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {connections.map((connection, i) => {
+                            const a = userById[connection.user_a_id]
+                            const b = userById[connection.user_b_id]
+                            const plan = plans.find(p => p.id === connection.plan_id)
+                            const isMutual = connection.user_a_wants_connect && connection.user_b_wants_connect
+                            return (
+                              <tr key={connection.id} style={{ background: i % 2 === 0 ? 'white' : '#FAFAF7', borderBottom: i < connections.length - 1 ? '1px solid #F0EDE8' : 'none' }}>
+                                <td style={{ padding: '10px 16px' }}>
+                                  <p style={{ fontSize: 13, color: '#1A1A1A', fontWeight: 700 }}>{a?.display_name ?? 'Usuario A'} ↔ {b?.display_name ?? 'Usuario B'}</p>
+                                  <p style={{ fontSize: 11, color: '#B0AA9E', marginTop: 1 }}>{a?.current_city ?? '—'} · {b?.current_city ?? '—'}</p>
+                                </td>
+                                <td style={{ padding: '10px 16px' }}>
+                                  <span style={{ background: isMutual ? '#EAF3DE' : '#EFF6FF', color: isMutual ? '#3B6D11' : '#2A60A8', fontSize: 10, fontWeight: 700, padding: '3px 8px', borderRadius: 6 }}>
+                                    {isMutual ? 'mutual' : 'one-way'}
+                                  </span>
+                                </td>
+                                <td style={{ padding: '10px 16px', fontSize: 12, color: '#6F695F' }}>{plan?.title ?? '—'}</td>
+                                <td style={{ padding: '10px 16px', fontSize: 13 }}>{connection.social_shared ? <span style={{ color: '#3B6D11', fontWeight: 700 }}>✓</span> : <span style={{ color: '#B0AA9E' }}>—</span>}</td>
+                                <td style={{ padding: '10px 16px', fontSize: 12, color: '#B0AA9E', whiteSpace: 'nowrap' }}>{formatShortDate(connection.connected_at)}</td>
+                              </tr>
+                            )
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
                 </div>
               )}
 
