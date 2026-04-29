@@ -32,7 +32,7 @@ export function BottomNav({ active, onNavigate }: BottomNavProps) {
       className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[430px] z-50"
       style={{ background: '#EAE6DF', borderTop: '1px solid #EAE6DF' }}
     >
-      <div className="flex" style={{ paddingBottom: 'env(safe-area-inset-bottom, 16px)' }}>
+      <div className="flex" style={{ paddingBottom: 'var(--safe-area-bottom)' }}>
         {NAV_ITEMS.map(({ id, label, Icon }) => {
           const isActive = id === active
           return (
