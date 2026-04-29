@@ -10,8 +10,31 @@ import { supabase } from '../../lib/supabase'
 type Mode = 'visiting' | 'local'
 
 const CITY_SUGGESTIONS = [
-  'Ciudad de México', 'Lisboa', 'Bogotá', 'Barcelona',
-  'Buenos Aires', 'Berlin', 'Tokyo', 'New York', 'London', 'Paris',
+  // Americas
+  'New York', 'Los Angeles', 'Miami', 'Chicago', 'San Francisco',
+  'Toronto', 'Vancouver', 'Montreal',
+  'Ciudad de México', 'Guadalajara', 'Monterrey',
+  'Guatemala', 'Antigua Guatemala',
+  'Bogotá', 'Medellín', 'Cartagena',
+  'Buenos Aires', 'Santiago', 'Lima', 'Quito',
+  'São Paulo', 'Río de Janeiro',
+  'La Habana', 'San José', 'Panamá',
+  // Europe
+  'London', 'Paris', 'Madrid', 'Barcelona', 'Lisboa',
+  'Berlin', 'Amsterdam', 'Brussels', 'Zurich', 'Vienna',
+  'Rome', 'Milan', 'Florence', 'Venice',
+  'Prague', 'Budapest', 'Warsaw', 'Athens',
+  'Copenhagen', 'Stockholm', 'Oslo', 'Helsinki',
+  'Dublin', 'Edinburgh',
+  'Istanbul',
+  // Middle East & Africa
+  'Dubai', 'Abu Dhabi', 'Tel Aviv', 'Beirut', 'Amman',
+  'Cairo', 'Casablanca', 'Cape Town', 'Nairobi', 'Lagos',
+  // Asia & Oceania
+  'Tokyo', 'Osaka', 'Seoul', 'Beijing', 'Shanghai', 'Hong Kong',
+  'Singapore', 'Bangkok', 'Bali', 'Chiang Mai',
+  'Mumbai', 'Delhi', 'Kathmandu',
+  'Sydney', 'Melbourne', 'Auckland',
 ]
 
 export function Step4Location() {
