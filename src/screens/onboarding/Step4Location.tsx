@@ -69,7 +69,8 @@ export function Step4Location() {
           has_invite: !!pendingInviteCodeEarly,
           trust_score: stored.trust_score ?? 50,
           is_verified: false,
-          membership_status: 'trial',
+          membership_status: pendingInviteCodeEarly ? 'active' : 'trial',
+          ...(pendingInviteCodeEarly ? { mindset_approved: true } : {}),
         }, { onConflict: 'user_id' })
         .select('id')
         .single()
@@ -141,6 +142,13 @@ export function Step4Location() {
                   user_a_wants_connect: true,
                   user_b_wants_connect: true,
                 })
+            }
+
+            if (inviterProfile?.id) {
+              await supabase.rpc('update_trust_score', {
+                p_profile_id: inviterProfile.id,
+                p_delta: 10,
+              })
             }
           }
         }

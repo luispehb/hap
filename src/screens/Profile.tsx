@@ -219,16 +219,12 @@ export function Profile() {
   useEffect(() => {
     if (!isOwnProfile || !ownProfile?.id) return
 
-    const inviterFilter = user?.id && user.id !== ownProfile.id
-      ? `inviter_id.eq.${ownProfile.id},inviter_id.eq.${user.id}`
-      : `inviter_id.eq.${ownProfile.id}`
-
     supabase
       .from('invitations')
-      .select('id', { count: 'exact' })
-      .or(inviterFilter)
+      .select('id', { count: 'exact', head: true })
+      .eq('inviter_id', ownProfile.id)
       .then(({ count }) => setInviteCount(count || 0))
-  }, [isOwnProfile, ownProfile?.id, user?.id])
+  }, [isOwnProfile, ownProfile?.id])
 
   useEffect(() => {
     if (!profile?.id) return
@@ -337,7 +333,7 @@ export function Profile() {
 
   const handleCopyLink = () => {
     if (!inviteCode) return
-    navigator.clipboard.writeText(`https://hop-chi.vercel.app/invite/${inviteCode}`)
+    navigator.clipboard.writeText(`https://app.go-hap.com/invite/${inviteCode}`)
     setInviteCopied(true)
     setTimeout(() => setInviteCopied(false), 2000)
   }
@@ -601,13 +597,13 @@ export function Profile() {
             <div className="bg-white border border-[#E8E4DC] rounded-2xl p-4">
               <div className="flex items-center justify-between mb-3">
                 <p className="text-ink text-sm font-bold">Invite link</p>
-                <p className="text-[10px] text-muted font-bold">{inviteCount}/3 used</p>
+                <p className="text-[10px] text-muted font-bold">{3 - inviteCount} left</p>
               </div>
               {inviteCode ? (
                 <div className="flex flex-col gap-2">
                   <div className="bg-sand rounded-xl px-3 py-2">
                     <p className="text-ink text-xs font-mono break-all">
-                      https://hop-chi.vercel.app/invite/{inviteCode}
+                      https://app.go-hap.com/invite/{inviteCode}
                     </p>
                   </div>
                   <button
