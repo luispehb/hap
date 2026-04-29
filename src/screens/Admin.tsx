@@ -406,7 +406,7 @@ export function Admin() {
       body: { userId: authUserId }
     })
     if (error) {
-      alert('Error al eliminar usuario. Intenta de nuevo.')
+      alert(`Error al eliminar usuario: ${await getFunctionErrorMessage(error)}`)
       return
     }
     setAllUsers(prev => prev.filter(u => u.id !== profileId))
