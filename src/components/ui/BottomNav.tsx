@@ -29,25 +29,23 @@ export function BottomNav({ active, onNavigate }: BottomNavProps) {
 
   return (
     <div
-      className="fixed left-1/2 -translate-x-1/2 w-full max-w-[430px] bg-cream border-t border-[#EAE6DF] z-50"
-      style={{ bottom: 'calc(env(safe-area-inset-bottom, 0px) * -1)' }}
+      className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[430px] z-50"
+      style={{ background: '#EAE6DF', borderTop: '1px solid #EAE6DF' }}
     >
-      <div className="flex pb-safe">
+      <div className="flex" style={{ paddingBottom: 'env(safe-area-inset-bottom, 16px)' }}>
         {NAV_ITEMS.map(({ id, label, Icon }) => {
           const isActive = id === active
           return (
             <button
               key={id}
               onClick={() => handleTab(id)}
-              className={`flex-1 flex flex-col items-center justify-center gap-1 pt-3 min-h-[56px] transition-colors cursor-pointer select-none ${
+              className={`flex-1 flex flex-col items-center gap-1 pt-3 pb-2 transition-colors cursor-pointer select-none min-h-[56px] ${
                 isActive ? 'text-sky' : 'text-muted'
               }`}
             >
               <Icon size={18} strokeWidth={isActive ? 2.5 : 1.8} />
               <span className="text-[9px] font-bold uppercase tracking-wider">{label}</span>
-              {isActive && (
-                <span className="w-1 h-1 rounded-full bg-sky mt-0.5" />
-              )}
+              {isActive && <span className="w-1 h-1 rounded-full bg-sky mt-0.5" />}
             </button>
           )
         })}
