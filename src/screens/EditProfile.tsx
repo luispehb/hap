@@ -185,20 +185,28 @@ export function EditProfile() {
       const { data, error: upErr } = await supabase.storage
         .from('avatars')
         .upload(`${user.id}/avatar.jpg`, avatarFile, { upsert: true, contentType: avatarFile.type })
-      if (!upErr && data) {
-        const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(data.path)
-        updates.avatar_url = urlData.publicUrl
+      if (upErr) {
+        setErrorMsg(`No se pudo subir la foto: ${upErr.message}`)
+        setSaving(false)
+        return
       }
+
+      const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(data.path)
+      updates.avatar_url = urlData.publicUrl
     }
 
     if (bannerFile) {
       const { data, error: upErr } = await supabase.storage
         .from('avatars')
         .upload(`${user.id}/banner.jpg`, bannerFile, { upsert: true, contentType: bannerFile.type })
-      if (!upErr && data) {
-        const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(data.path)
-        updates.banner_url = urlData.publicUrl
+      if (upErr) {
+        setErrorMsg(`No se pudo subir el banner: ${upErr.message}`)
+        setSaving(false)
+        return
       }
+
+      const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(data.path)
+      updates.banner_url = urlData.publicUrl
     }
 
     const { error } = await supabase

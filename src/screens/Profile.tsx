@@ -6,7 +6,7 @@ import { useProfile } from '../hooks/useProfile'
 import { Chip } from '../components/ui/Chip'
 import { Button } from '../components/ui/Button'
 import { BottomNav } from '../components/ui/BottomNav'
-import { getProfilePhoto, getBannerPhoto, hashString } from '../lib/photos'
+import { getProfilePhoto, getBannerPhoto } from '../lib/photos'
 import { TrustBadge } from '../components/ui/TrustBadge'
 import { PendingApprovalBanner } from '../components/ui/PendingApprovalBanner'
 import { supabase } from '../lib/supabase'
@@ -176,7 +176,6 @@ export function Profile() {
   const [connection, setConnection] = useState<Record<string, unknown> | null>(null)
   const [connecting, setConnecting] = useState(false)
   const [toast, setToast] = useState('')
-  const [photoIndex, setPhotoIndex] = useState(0)
   const [inviteCode, setInviteCode] = useState<string | null>(null)
   const [inviteCount, setInviteCount] = useState(0)
   const [inviteCopied, setInviteCopied] = useState(false)
@@ -438,12 +437,6 @@ export function Profile() {
   const resolvedAvatar = pp.avatar_url || getProfilePhoto(profile.display_name, profile.home_city)
   const resolvedBanner = pp.banner_url || getBannerPhoto(profile.display_name, profile.home_city)
 
-  const carouselPhotos = [
-    resolvedAvatar,
-    resolvedBanner,
-    `https://picsum.photos/seed/${hashString(profile.id + 'c3')}/400/500`,
-  ]
-
   return (
     <div className="h-app bg-cream flex flex-col overflow-hidden">
 
@@ -490,37 +483,15 @@ export function Profile() {
           )}
         </div>
       ) : (
-        /* Non-own profile: Raya-style photo carousel */
+        /* Non-own profile: banner background + prominent avatar */
         <div className="relative h-[280px] overflow-hidden flex-shrink-0">
-          <div
-            className="flex h-full transition-transform duration-300"
-            style={{ transform: `translateX(-${photoIndex * 100}%)` }}
-          >
-            {carouselPhotos.map((photo, i) => (
-              <div key={i} className="w-full h-full flex-shrink-0">
-                <img
-                  src={photo}
-                  alt=""
-                  className="w-full h-full object-cover"
-                  onError={e => { e.currentTarget.style.display = 'none' }}
-                />
-              </div>
-            ))}
-          </div>
-          {/* Tap zones */}
-          <div className="absolute inset-0 flex z-10">
-            <div className="flex-1 cursor-pointer" onClick={() => setPhotoIndex(i => Math.max(0, i - 1))} />
-            <div className="flex-1 cursor-pointer" onClick={() => setPhotoIndex(i => Math.min(carouselPhotos.length - 1, i + 1))} />
-          </div>
-          {/* Dots */}
-          <div className="absolute top-3 left-0 right-0 flex justify-center gap-1.5 z-20">
-            {carouselPhotos.map((_, i) => (
-              <div
-                key={i}
-                className={`h-1 rounded-full transition-all ${i === photoIndex ? 'w-6 bg-white' : 'w-1.5 bg-white/50'}`}
-              />
-            ))}
-          </div>
+          <img
+            src={resolvedBanner}
+            alt=""
+            className="absolute inset-0 w-full h-full object-cover"
+            onError={e => { e.currentTarget.style.display = 'none' }}
+          />
+          <div className="absolute inset-0 -z-10" style={{ background: 'linear-gradient(135deg, #B8D4E8, #7EB3D4)' }} />
           {/* Back button */}
           <button
             onClick={() => navigate(-1)}
@@ -534,9 +505,17 @@ export function Profile() {
             style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.7) 0%, transparent 100%)' }}
           />
           {/* Name + trust badge overlay */}
-          <div className="absolute bottom-4 left-4 right-4 z-20">
-            <div className="flex items-end justify-between">
-              <div>
+          <div className="absolute bottom-4 left-4 right-4 z-20 flex items-end gap-3">
+            <div className="w-24 h-24 rounded-2xl overflow-hidden flex-shrink-0 bg-sand shadow-lg" style={{ border: '3px solid white' }}>
+              <img
+                src={resolvedAvatar}
+                alt={profile.display_name}
+                className="w-full h-full object-cover"
+                onError={e => { e.currentTarget.style.display = 'none' }}
+              />
+            </div>
+            <div className="min-w-0 flex-1 flex items-end justify-between gap-3">
+              <div className="min-w-0">
                 <p className="text-white font-extrabold text-2xl tracking-tight leading-tight">
                   {profile.display_name}
                 </p>
@@ -544,7 +523,9 @@ export function Profile() {
                   {profile.home_city} · {daysLabel}
                 </p>
               </div>
-              <TrustBadge score={profile.trust_score} />
+              <div className="flex-shrink-0">
+                <TrustBadge score={profile.trust_score} />
+              </div>
             </div>
           </div>
         </div>
