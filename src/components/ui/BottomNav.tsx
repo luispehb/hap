@@ -29,7 +29,7 @@ export function BottomNav({ active, onNavigate }: BottomNavProps) {
 
   return (
     <div
-      className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[430px] z-50"
+      className="bottom-nav fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[430px] z-50"
       style={{ background: '#EAE6DF', borderTop: '1px solid #EAE6DF' }}
     >
       <div className="flex" style={{ paddingBottom: 'var(--safe-area-bottom)' }}>

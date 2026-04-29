@@ -4,12 +4,25 @@ import './index.css'
 import App from './App.tsx'
 import { supabase } from './lib/supabase'
 
+function syncDisplayMode() {
+  const navigatorWithStandalone = window.navigator as Navigator & { standalone?: boolean }
+  const isStandalone = navigatorWithStandalone.standalone === true || window.matchMedia('(display-mode: standalone)').matches
+  document.documentElement.classList.toggle('is-standalone', isStandalone)
+}
+
 function syncAppViewportHeight() {
   const height = window.visualViewport?.height ?? window.innerHeight
   document.documentElement.style.setProperty('--app-height', `${height}px`)
 }
 
+syncDisplayMode()
 syncAppViewportHeight()
+const displayModeQuery = window.matchMedia('(display-mode: standalone)')
+if ('addEventListener' in displayModeQuery) {
+  displayModeQuery.addEventListener('change', syncDisplayMode)
+} else {
+  ;(displayModeQuery as MediaQueryList & { addListener: (listener: () => void) => void }).addListener(syncDisplayMode)
+}
 window.addEventListener('resize', syncAppViewportHeight)
 window.visualViewport?.addEventListener('resize', syncAppViewportHeight)
 window.visualViewport?.addEventListener('scroll', syncAppViewportHeight)
