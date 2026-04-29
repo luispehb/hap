@@ -61,6 +61,8 @@ interface InviteCode {
   used: boolean
   created_at: string
   inviter_id: string
+  profiles?: { display_name: string } | null
+  used_profile?: { display_name: string } | null
 }
 
 interface AdminPlan {
@@ -309,7 +311,7 @@ export function Admin() {
         .order('created_at', { ascending: false }),
       supabase
         .from('invitations')
-        .select('*')
+        .select('*, profiles!invitations_inviter_id_fkey(display_name), used_profile:profiles!invitations_used_by_fkey(display_name)')
         .order('created_at', { ascending: false }),
       supabase
         .from('plans')
@@ -366,7 +368,7 @@ export function Admin() {
     const { data } = await supabase
       .from('invitations')
       .insert({ inviter_id: user.id, code, used: false })
-      .select()
+      .select('*, profiles!invitations_inviter_id_fkey(display_name), used_profile:profiles!invitations_used_by_fkey(display_name)')
       .single()
     if (data) {
       setInviteCodes(prev => [data, ...prev])
@@ -376,9 +378,14 @@ export function Admin() {
   }
 
   const handleCopyCode = (code: string) => {
-    navigator.clipboard.writeText(code)
+    navigator.clipboard.writeText(`https://app.go-hap.com/invite/${code}`)
     setCopiedCode(code)
     setTimeout(() => setCopiedCode(null), 2000)
+  }
+
+  const handleDeleteInvite = async (id: string) => {
+    await supabase.from('invitations').delete().eq('id', id)
+    setInviteCodes(prev => prev.filter(i => i.id !== id))
   }
 
   const handleUserSave = async () => {
@@ -1116,14 +1123,14 @@ export function Admin() {
                       <p style={{ fontSize: 14, color: '#B0AA9E' }}>No hay códigos aún · genera el primero</p>
                     </div>
                   ) : (
-                    <div className="bg-white border border-[#E8E4DC]" style={{ borderRadius: 12, overflow: 'hidden' }}>
-                      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    <div className="bg-white border border-[#E8E4DC] overflow-x-auto" style={{ borderRadius: 12 }}>
+                      <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 700 }}>
                         <thead>
                           <tr style={{ borderBottom: '1px solid #E8E4DC' }}>
-                            {['Código', 'Creado', 'Estado'].map(col => (
+                            {['Código + Link', 'Generado por', 'Usado por', 'Creado', 'Estado', 'Acción'].map(col => (
                               <th
                                 key={col}
-                                style={{ padding: '10px 16px', textAlign: 'left', fontSize: 11, fontWeight: 600, color: '#B0AA9E', textTransform: 'uppercase', letterSpacing: '0.06em' }}
+                                style={{ padding: '10px 16px', textAlign: 'left', fontSize: 11, fontWeight: 600, color: '#B0AA9E', textTransform: 'uppercase', letterSpacing: '0.06em', whiteSpace: 'nowrap' }}
                               >
                                 {col}
                               </th>
@@ -1139,19 +1146,40 @@ export function Admin() {
                                 key={inv.id}
                                 style={{ background: i % 2 === 0 ? 'white' : '#FAFAF7', borderBottom: i < inviteCodes.length - 1 ? '1px solid #F0EDE8' : 'none' }}
                               >
+                                {/* Código + Link */}
                                 <td style={{ padding: '10px 16px' }}>
-                                  <button
-                                    onClick={() => handleCopyCode(inv.code)}
-                                    className="cursor-pointer transition-all"
-                                    style={{ fontFamily: 'monospace', fontSize: 13, fontWeight: 600, color: isNew ? '#4A90D9' : '#1A1A1A', background: 'none', border: 'none', padding: 0, letterSpacing: '0.1em' }}
-                                    title="Copiar al portapapeles"
-                                  >
-                                    {isCopied ? '¡Copiado!' : inv.code}
-                                  </button>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                                    <span style={{ fontFamily: 'monospace', fontSize: 13, fontWeight: 600, color: isNew ? '#4A90D9' : '#1A1A1A', letterSpacing: '0.1em' }}>
+                                      {inv.code}
+                                    </span>
+                                    <span style={{ fontSize: 11, color: '#B0AA9E' }}>app.go-hap.com/invite/{inv.code}</span>
+                                    <button
+                                      onClick={() => handleCopyCode(inv.code)}
+                                      className="cursor-pointer transition-all hover:bg-sky/10"
+                                      style={{ fontSize: 10, fontWeight: 700, color: '#4A90D9', border: '1px solid rgba(74,144,217,0.3)', padding: '2px 8px', borderRadius: 999, background: 'none' }}
+                                    >
+                                      {isCopied ? 'Copiado ✓' : 'Copy'}
+                                    </button>
+                                  </div>
                                 </td>
+                                {/* Generado por */}
+                                <td style={{ padding: '10px 16px', fontSize: 12, color: '#1A1A1A', whiteSpace: 'nowrap' }}>
+                                  {inv.profiles?.display_name ?? '—'}
+                                </td>
+                                {/* Usado por */}
+                                <td style={{ padding: '10px 16px', fontSize: 12, whiteSpace: 'nowrap' }}>
+                                  {inv.used
+                                    ? inv.used_profile?.display_name
+                                      ? <span style={{ color: '#3B6D11', fontWeight: 500 }}>{inv.used_profile.display_name}</span>
+                                      : <span style={{ color: '#B0AA9E' }}>Usado</span>
+                                    : <span style={{ color: '#B0AA9E' }}>—</span>
+                                  }
+                                </td>
+                                {/* Creado */}
                                 <td style={{ padding: '10px 16px', fontSize: 12, color: '#B0AA9E', whiteSpace: 'nowrap' }}>
                                   {new Date(inv.created_at).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })}
                                 </td>
+                                {/* Estado */}
                                 <td style={{ padding: '10px 16px' }}>
                                   {inv.used ? (
                                     <span style={{ background: '#EAE6DF', color: '#B0AA9E', fontSize: 10, fontWeight: 500, padding: '3px 8px', borderRadius: 6 }}>
@@ -1161,6 +1189,18 @@ export function Admin() {
                                     <span style={{ background: '#EAF3DE', color: '#3B6D11', fontSize: 10, fontWeight: 500, padding: '3px 8px', borderRadius: 6 }}>
                                       disponible
                                     </span>
+                                  )}
+                                </td>
+                                {/* Acción */}
+                                <td style={{ padding: '10px 16px' }}>
+                                  {!inv.used && (
+                                    <button
+                                      onClick={() => handleDeleteInvite(inv.id)}
+                                      className="cursor-pointer transition-all hover:bg-red-50"
+                                      style={{ fontSize: 10, fontWeight: 700, color: '#F87171', border: '1px solid #FECACA', padding: '2px 8px', borderRadius: 999, background: 'none' }}
+                                    >
+                                      Cancelar
+                                    </button>
                                   )}
                                 </td>
                               </tr>
