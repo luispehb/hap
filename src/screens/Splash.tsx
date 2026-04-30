@@ -14,6 +14,9 @@ export function Splash() {
   const [otpLoading, setOtpLoading] = useState(false)
   const [otpError, setOtpError] = useState('')
 
+  const normalizedEmail = email.trim().toLowerCase()
+  const canSendOTP = normalizedEmail.includes('@') && !otpLoading
+
   useEffect(() => {
     if (loading) return
     if (user && profile) navigate('/feed', { replace: true })
@@ -34,19 +37,26 @@ export function Splash() {
   if (loading) return <LoadingScreen message={error ?? 'Taking longer than usual...'} onRetry={retryAuth} />
 
   async function handleSendOTP() {
-    if (!email.includes('@')) return
+    if (!canSendOTP) return
     setOtpLoading(true)
     setOtpError('')
-    const { error } = await supabase.auth.signInWithOtp({
-      email,
-      options: { shouldCreateUser: true },
-    })
-    if (error) {
-      setOtpError(error.message)
-    } else {
-      setOtpSent(true)
+    try {
+      const { error } = await supabase.auth.signInWithOtp({
+        email: normalizedEmail,
+        options: { shouldCreateUser: true },
+      })
+      if (error) {
+        setOtpError(error.message)
+      } else {
+        setEmail(normalizedEmail)
+        setOtpSent(true)
+      }
+    } catch (err) {
+      console.error('OTP send error:', err)
+      setOtpError('We could not send the code. Please try again.')
+    } finally {
+      setOtpLoading(false)
     }
-    setOtpLoading(false)
   }
 
   async function handleVerifyOTP() {
@@ -54,7 +64,7 @@ export function Splash() {
     setOtpLoading(true)
     setOtpError('')
     const { error } = await supabase.auth.verifyOtp({
-      email,
+      email: normalizedEmail,
       token: otp,
       type: 'email',
     })
@@ -98,11 +108,14 @@ export function Splash() {
             />
             <button
               onClick={handleSendOTP}
-              disabled={!email.includes('@') || otpLoading}
+              disabled={!canSendOTP}
               className="w-full bg-sky text-white font-bold py-3.5 rounded-xl text-sm disabled:opacity-40 active:opacity-80 transition cursor-pointer"
             >
               {otpLoading ? 'Sending...' : 'Send code →'}
             </button>
+            {otpError && (
+              <p className="text-red-400 text-xs text-center">{otpError}</p>
+            )}
           </div>
         ) : (
           <div className="flex flex-col gap-3 w-full">
