@@ -125,18 +125,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setLoading(false)
       } else {
         fetchingForRef.current = null
-        if (retryCountRef.current < 4) {
-          retryCountRef.current++
-          const delay = retryCountRef.current * 3000
-          console.log(`Profile not found, retry ${retryCountRef.current}/4 in ${delay}ms`)
-          setTimeout(() => {
-            if (mountedRef.current) void runFetchProfile(userId, true)
-          }, delay)
-        } else {
-          retryCountRef.current = 0
-          setError('We could not load your profile right now.')
-          setLoading(false)
-        }
+        retryCountRef.current = 0
+        updateProfile(null)
+        setLoading(false)
       }
     } catch (err) {
       console.error('fetchProfile error:', err)

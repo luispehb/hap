@@ -4,6 +4,18 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { LoadingScreen } from '../components/LoadingScreen'
 
+const OTP_TIMEOUT_MS = 12000
+
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number, message: string): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timeout = window.setTimeout(() => reject(new Error(message)), timeoutMs)
+    promise
+      .then(resolve)
+      .catch(reject)
+      .finally(() => window.clearTimeout(timeout))
+  })
+}
+
 export function Splash() {
   const navigate = useNavigate()
   const { user, profile, loading, error, retryAuth } = useAuth()
@@ -41,10 +53,14 @@ export function Splash() {
     setOtpLoading(true)
     setOtpError('')
     try {
-      const { error } = await supabase.auth.signInWithOtp({
-        email: normalizedEmail,
-        options: { shouldCreateUser: true },
-      })
+      const { error } = await withTimeout(
+        supabase.auth.signInWithOtp({
+          email: normalizedEmail,
+          options: { shouldCreateUser: true },
+        }),
+        OTP_TIMEOUT_MS,
+        'The email service is taking too long. Please try again.'
+      )
       if (error) {
         setOtpError(error.message)
       } else {
@@ -53,7 +69,7 @@ export function Splash() {
       }
     } catch (err) {
       console.error('OTP send error:', err)
-      setOtpError('We could not send the code. Please try again.')
+      setOtpError(err instanceof Error ? err.message : 'We could not send the code. Please try again.')
     } finally {
       setOtpLoading(false)
     }
